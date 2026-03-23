@@ -21,6 +21,15 @@ env/
 # Local runtime artifacts
 logs/
 *.log
+*.zip
+
+# Backend generated state
+.backend/__pycache__/
+.backend/cache/
+.backend/metadata.sqlite
+
+# Build outputs
+dist/
 
 # Large local/runtime dependencies
 bin/

@@ -1,0 +1,1971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Manager Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --primary: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 30px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item {
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: var(--surface-hover);
+        }
+        
+        .nav-item.active {
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 30px 40px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        header { margin-bottom: 30px; }
+        h1 { font-size: 2rem; margin: 0; }
+        .subtitle { color: var(--text-muted); margin-top: 5px; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            background: var(--surface);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .toolbar input[type="text"], .toolbar select {
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+        }
+        
+        .toolbar .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-width, 280px), 1fr));
+            gap: 25px;
+        }
+
+        /* Model Card */
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border-color: var(--primary);
+        }
+
+        .card-img-container {
+            position: relative;
+            width: 100%;
+            padding-top: 133%; /* 3:4 aspect ratio */
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        .card-img {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+        }
+
+        /* Card Overlay Tags */
+        .card-tags {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            z-index: 2;
+        }
+
+        /* Card Carousel / Video */
+        .carousel-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.6); color: white; border: none;
+            width: 30px; height: 30px; border-radius: 50%;
+            cursor: pointer; z-index: 3; display: none; align-items: center; justify-content: center; font-weight: bold;
+        }
+        .card-img-container:hover .carousel-btn { display: flex; }
+        .carousel-btn.left { left: 5px; }
+        .carousel-btn.right { right: 5px; }
+        .carousel-btn:hover { background: rgba(59, 130, 246, 0.8); }
+        .meta-pill {
+            display: inline-block; padding: 4px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border); margin: 2px;
+        }
+
+        .badge {
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .badge.type { background-color: rgba(59, 130, 246, 0.8); }
+
+        /* Card Bottom Banner */
+        .card-banner {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(15, 23, 42, 0.95));
+            padding: 20px 15px 15px 15px;
+            z-index: 2;
+        }
+        
+        .card-banner h3 {
+            margin: 0 0 5px 0;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .card-meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+        }
+
+        /* Standard Cards (Non-Explorer) */
+        .std-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        /* Lightbox Modal */
+        .lightbox-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .lightbox-content {
+            background: var(--surface);
+            width: 100%;
+            max-width: 1100px;
+            height: auto;
+            max-height: 90vh;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .lb-gallery {
+            width: 45%;
+            background: #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .lb-gallery img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .lb-details {
+            flex: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 20px; right: 30px;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            z-index: 101;
+        }
+
+        .lb-title { font-size: 1.8rem; margin: 0; }
+        .lb-creator { color: var(--text-muted); font-size: 0.9rem; }
+        
+        .section-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+        }
+        
+        .select-fancy {
+            width: 100%;
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn-download:hover { opacity: 0.9; }
+        .btn-download:disabled { background: var(--surface-hover); cursor: not-allowed; opacity: 0.7;}
+
+        .trigger-words {
+            background: var(--bg-color);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-family: monospace;
+            color: #a7f3d0;
+            word-wrap: break-word;
+        }
+
+        /* Active Downloads Bar */
+        #active-downloads {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .download-toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+        
+        .dl-bar-bg { width: 100%; height: 6px; background: var(--bg-color); border-radius: 3px; margin-top: 10px; overflow: hidden;}
+        .dl-bar-fill { height: 100%; background: var(--primary); transition: width 0.3s linear; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background-color: var(--surface);
+            border-radius: 12px;
+            border: 1px dashed var(--border);
+            grid-column: 1 / -1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>🚀 AI Manager</h2>
+        <div class="nav-item active" onclick="switchTab('explorer')">Model Explorer</div>
+        <div class="nav-item" onclick="switchTab('vault')">Global Vault</div>
+        <div class="nav-item" onclick="switchTab('inference')">Inference Studio</div>
+        <div class="nav-item" onclick="switchTab('appstore')">App Store</div>
+        <div class="nav-item" onclick="switchTab('packages')">Installed Packages</div>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <h1 id="page-title">Model Explorer</h1>
+            <div id="page-subtitle" class="subtitle">Discover and download native models directly from CivitAI.</div>
+        </header>
+
+        <!-- Model Explorer View -->
+        <div id="view-explorer">
+            <div class="toolbar">
+                <input type="text" id="ex-search" placeholder="Search models, tags..." style="flex: 1;" onchange="loadExplorer()">
+                
+                <select id="ex-sort" onchange="loadExplorer()">
+                    <option value="Highest Rated">Highest Rated</option>
+                    <option value="Most Downloaded">Most Downloaded</option>
+                    <option value="Newest">Newest</option>
+                    <option value="Favorites">🌟 Favorites</option>
+                </select>
+                
+                <select id="ex-type" onchange="loadExplorer()">
+                    <option value="">All Types</option>
+                    <option value="Checkpoint">Checkpoint</option>
+                    <option value="Controlnet">ControlNet</option>
+                    <option value="DoRA">DoRA</option>
+                    <option value="Hypernetwork">Hypernetwork</option>
+                    <option value="LoCon">LoCon</option>
+                    <option value="LORA">LoRA</option>
+                    <option value="TextualInversion">Embedding / TextualInversion</option>
+                    <option value="Upscaler">Upscaler</option>
+                    <option value="VAE">VAE</option>
+                </select>
+
+                <select id="ex-base" onchange="loadExplorer()">
+                    <option value="">All Base Models</option>
+                    <option value="SD 1.4">SD 1.4</option>
+                    <option value="SD 1.5">SD 1.5</option>
+                    <option value="SD 1.5 LCM">SD 1.5 LCM</option>
+                    <option value="SD 2.0">SD 2.0</option>
+                    <option value="SD 2.1">SD 2.1</option>
+                    <option value="SDXL 0.9">SDXL 0.9</option>
+                    <option value="SDXL 1.0">SDXL 1.0</option>
+                    <option value="SDXL 1.0 LCM">SDXL 1.0 LCM</option>
+                    <option value="SDXL Turbo">SDXL Turbo</option>
+                    <option value="SDXL Lightning">SDXL Lightning</option>
+                    <option value="Pony">Pony</option>
+                    <option value="SD 3">SD 3</option>
+                    <option value="SD 3.5">SD 3.5</option>
+                    <option value="Flux.1 S">Flux.1 Schnell</option>
+                    <option value="Flux.1 D">Flux.1 Dev</option>
+                    <option value="AuraFlow">AuraFlow</option>
+                    <option value="Hunyuan 1">Hunyuan</option>
+                    <option value="Playground v2">Playground v2</option>
+                    <option value="Cascade">Cascade</option>
+                </select>
+
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.9rem;" onclick="handleNsfwClick(event)">
+                    <input type="checkbox" id="ex-nsfw" style="pointer-events:none;"> Show NSFW
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.9rem;">
+                    <input type="checkbox" id="ex-early" onchange="loadExplorer()"> Early Access
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.9rem;">
+                    <input type="checkbox" id="ex-installed" onchange="loadExplorer()"> Hide Installed
+                </label>
+
+                <div class="zoom-control">
+                    <span>Card Size</span>
+                    <input type="range" min="150" max="400" value="280" oninput="document.getElementById('explorer-grid').style.setProperty('--card-width', this.value + 'px')">
+                </div>
+            </div>
+
+            <div class="grid" id="explorer-grid">
+                <div class="empty-state">Loading CivitAI Database...</div>
+            </div>
+        </div>
+
+        <!-- Vault View -->
+        <div id="view-vault" style="display: none;">
+            <div class="grid" id="models-grid" style="--card-width: 250px;"></div>
+        </div>
+
+        <!-- App Store View -->
+        <div id="view-appstore" style="display: none;">
+            <div class="grid" id="recipes-grid"></div>
+        </div>
+
+        <!-- Packages View -->
+        <div id="view-packages" class="view-content" style="display: none;">
+            <div class="grid" id="packages-grid"></div>
+        </div>
+
+    <!-- Active Downloads Overlay -->
+    <div id="active-downloads"></div>
+
+    <!-- Lightbox Modal -->
+    <div class="lightbox-overlay" id="lightbox" onclick="if(event.target===this) closeLightbox()">
+        <span class="close-btn" onclick="closeLightbox()">&times;</span>
+        <div class="lightbox-content">
+            <div class="lb-gallery" style="position:relative;">
+                <div id="lb-gallery-wrapper" style="width:100%; height:100%; display:flex; justify-content:center; align-items:center;"></div>
+                <button class="carousel-btn left" style="display:flex; left:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(-1)">&lt;</button>
+                <button class="carousel-btn right" style="display:flex; right:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(1)">&gt;</button>
+            </div>
+            <div class="lb-details">
+                <div>
+                    <h2 class="lb-title" id="lb-title">Model Name</h2>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="lb-creator" id="lb-creator">by Creator</div>
+                        <a id="lb-civitai-link" href="#" target="_blank" style="color:var(--primary); text-decoration:none; font-size:0.85rem; font-weight:600;">View on CivitAI</a>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="section-title">Version Selection</div>
+                    <select id="lb-version-select" class="select-fancy" onchange="updateLightboxVersion()"></select>
+                </div>
+                
+                <div id="lb-trigger-container" style="display:none;">
+                    <div class="section-title">Trigger Words</div>
+                    <div class="trigger-words" id="lb-triggers"></div>
+                </div>
+
+                <div id="lb-meta-container" style="display:none; margin-top:20px;">
+                    <div class="section-title">Generation Prompts</div>
+                    <div id="lb-metadata" style="background:var(--bg-color); padding:15px; border-radius:8px; border:1px solid var(--border); font-size:0.85rem; color:#f1f5f9;"></div>
+                </div>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;" id="lb-tags-container"></div>
+
+                <div style="margin-top: auto;">
+                    <div id="lb-actions-standard">
+                        <button class="btn-download" id="lb-download-btn" onclick="executeDownload()">
+                            Download Metadata Resolving...
+                        </button>
+                        <div style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:10px;" id="lb-download-meta"></div>
+                    </div>
+                    <div id="lb-actions-vault" style="display:none; gap:10px;">
+                        <button onclick="executeVaultOpenFolder()" style="flex:1; background:var(--surface-hover); color:#fff; border:1px solid rgba(255,255,255,0.1); padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Open Folder</button>
+                        <button onclick="executeVaultRedownload()" style="flex:1; background:var(--primary); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Redownload</button>
+                        <button onclick="executeVaultDelete()" style="background:#ef4444; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inference View -->
+    <div id="view-inference" class="view-content" style="display: none; height: calc(100vh - 120px); flex-direction: row; gap: 20px;">
+        <!-- Left Sidebar: Config -->
+        <div style="width: 340px; background: var(--bg-color); display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 10px;"
+             ondragover="event.preventDefault(); this.style.opacity=0.6;"
+             ondragleave="this.style.opacity=1.0;"
+             ondrop="event.preventDefault(); this.style.opacity=1.0; restoreMetadataFromDrop(event);">
+            
+            <!-- Generation Controls -->
+            <div style="background: var(--surface); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column;">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 10;">
+                <h3 style="margin: 0; font-size: 1rem;">Config</h3>
+                <button id="inf-launch-btn" onclick="launchComfyUI()" style="background: var(--surface-hover); border: 1px solid var(--border); color: #cbd5e1; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight:600;">Launch Engine</button>
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <div>
+                    <label class="section-title">Model Checkpoint</label>
+                    <select id="inf-model" class="select-fancy"></select>
+                </div>
+                <div>
+                    <label class="section-title">Refiner Checkpoint</label>
+                    <select id="inf-refiner" class="select-fancy">
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="section-title">VAE Model</label>
+                    <select id="inf-vae" class="select-fancy">
+                        <option value="none">Baked VAE</option>
+                    </select>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label class="section-title" style="margin: 0;">LoRA Network</label>
+                        <button onclick="addLoraSlot()" style="background: var(--primary); border: none; color: #fff; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">+ Add LoRA</button>
+                    </div>
+                    <div id="inf-lora-container" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- dynamic lora slots added here -->
+                    </div>
+                </div>
+                <div>
+                    <label class="section-title">Sampler Engine</label>
+                    <select id="inf-sampler" class="select-fancy">
+                        <option value="euler">Euler</option>
+                        <option value="euler_ancestral">Euler A</option>
+                        <option value="dpmpp_2m">DPM++ 2M</option>
+                        <option value="dpmpp_sde">DPM++ SDE</option>
+                        <option value="lcm">LCM</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="section-title">Scheduler Noise</label>
+                    <select id="inf-scheduler" class="select-fancy">
+                        <option value="normal">Normal</option>
+                        <option value="karras">Karras</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="sgm_uniform">SGM Uniform</option>
+                        <option value="simple">Simple</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label class="section-title">Steps Base</label>
+                        <input type="number" id="inf-steps" class="select-fancy" value="20" min="1" max="150">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="section-title">Steps Refiner</label>
+                        <input type="number" id="inf-refiner-steps" class="select-fancy" value="10" min="1" max="150">
+                    </div>
+                </div>
+                <div>
+                    <label class="section-title">CFG Scale</label>
+                    <input type="number" id="inf-cfg" class="select-fancy" value="7.0" step="0.5" min="1" max="30">
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label class="section-title">Width</label>
+                        <input type="number" id="inf-width" class="select-fancy" value="1024" step="64">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="section-title">Height</label>
+                        <input type="number" id="inf-height" class="select-fancy" value="1024" step="64">
+                    </div>
+                </div>
+                <div>
+                    <label class="section-title">Seed</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="inf-seed" class="select-fancy" value="-1" style="flex: 1;">
+                        <button onclick="document.getElementById('inf-seed').value = Math.floor(Math.random() * 1e15)" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 15px; border-radius: 8px; cursor: pointer;">🎲</button>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('inf-hires-container').style.display = document.getElementById('inf-hires-container').style.display === 'none' ? 'flex' : 'none';">
+                        <label class="section-title" style="margin: 0; cursor: pointer;">High-Res Fix (x1.5)</label>
+                        <input type="checkbox" id="inf-hires-enable" style="transform: scale(1.2); cursor: pointer;" onchange="event.stopPropagation();">
+                    </div>
+                    <div id="inf-hires-container" style="display: none; flex-direction: column; gap: 15px; margin-top: 15px;">
+                        <div>
+                            <label class="section-title">Upscaler Type</label>
+                            <select id="inf-hires-upscaler" class="select-fancy">
+                                <option value="latent">Latent</option>
+                                <option value="esrgan">ESRGAN</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <div style="flex: 1;">
+                                <label class="section-title">Steps</label>
+                                <input type="number" id="inf-hires-steps" class="select-fancy" value="10" min="1" max="50">
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="section-title">Scale</label>
+                                <input type="number" id="inf-hires-factor" class="select-fancy" value="1.5" step="0.1" min="1.1" max="4.0">
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="section-title">Denoise</label>
+                                <input type="number" id="inf-hires-denoise" class="select-fancy" value="0.4" step="0.05" min="0.0" max="1.0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div style="border-top: 1px solid var(--border); padding-top: 15px; padding-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('inf-cn-container').style.display = document.getElementById('inf-cn-container').style.display === 'none' ? 'flex' : 'none';">
+                        <label class="section-title" style="margin: 0; cursor: pointer;">ControlNet Engine</label>
+                        <input type="checkbox" id="inf-cn-enable" style="transform: scale(1.2); cursor: pointer;" onchange="event.stopPropagation();">
+                    </div>
+                    <div id="inf-cn-container" style="display: none; flex-direction: column; gap: 15px; margin-top: 15px;">
+                        <select id="inf-cn-model" class="select-fancy">
+                            <option value="">Select ControlNet Model...</option>
+                        </select>
+                        <div id="inf-cn-dropzone" style="border: 2px dashed var(--border); padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; color: var(--text-muted); position: relative; overflow: hidden; height: 100px; display: flex; align-items: center; justify-content: center; background: var(--bg-color);" 
+                             onclick="document.getElementById('inf-cn-file').click()"
+                             ondragover="event.preventDefault();"
+                             ondrop="event.preventDefault(); if(event.dataTransfer.files.length) { document.getElementById('inf-cn-file').files = event.dataTransfer.files; handleCnUpload({target: document.getElementById('inf-cn-file')}); }">
+                            <span id="inf-cn-text">Drop ControlNet Reference</span>
+                            <img id="inf-cn-preview" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; display: none; opacity: 0.6;">
+                            <input type="file" id="inf-cn-file" accept="image/*" style="display: none;" onchange="handleCnUpload(event)">
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <div style="flex: 1;">
+                                <label class="section-title" style="margin: 0; font-size: 0.8rem;">Strength</label>
+                                <input type="number" id="inf-cn-strength" class="select-fancy" value="1.0" step="0.05">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+            
+        <!-- Middle Column: Prompts -->
+        <div style="width: 360px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 10px;">
+            <!-- Prompts -->
+            <div style="background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column;">
+                <label class="section-title">Prompt</label>
+                <textarea id="inf-prompt" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit; margin-bottom: 20px;" placeholder="masterpiece, best quality, highly detailed..."></textarea>
+                
+                <label class="section-title">Negative Prompt</label>
+                <textarea id="inf-negative" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit;" placeholder="worst quality, low quality, blurry..."></textarea>
+                
+                <div style="margin-top: 20px;">
+                    <label class="section-title">Image-to-Image (Optional Reference Input)</label>
+                    <div id="inf-img2img-dropzone" style="border: 2px dashed var(--border); padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; color: var(--text-muted); position: relative; overflow: hidden; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--bg-color);" 
+                         onclick="document.getElementById('inf-img2img-file').click()"
+                             ondragover="event.preventDefault();"
+                             ondrop="event.preventDefault(); if(event.dataTransfer.files.length) { document.getElementById('inf-img2img-file').files = event.dataTransfer.files; handleImg2ImgUpload({target: document.getElementById('inf-img2img-file')}); }">
+                        <span id="inf-img2img-text">Drag & Drop Base Image Here or Click</span>
+                        <img id="inf-img2img-preview" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; display: none; opacity: 0.6;">
+                        <input type="file" id="inf-img2img-file" accept="image/*" style="display: none;" onchange="handleImg2ImgUpload(event)">
+                    </div>
+                    <div style="display: flex; gap: 15px; margin-top: 10px;">
+                        <div style="flex: 1;">
+                            <label class="section-title" style="margin: 0; font-size: 0.8rem;">Denoise Strength</label>
+                            <input type="range" id="inf-img2img-denoise" min="0.0" max="1.0" step="0.01" value="0.75" style="width: 100%;">
+                        </div>
+                        <button onclick="clearImg2Img()" style="background: none; border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; cursor: pointer; padding: 0 10px;">Clear Base</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 20px; margin-bottom: 20px;">
+                <button class="btn-download" id="inf-generate-btn" onclick="executeInference()" style="position: relative; overflow: hidden; height: 60px; font-size: 1.2rem;">
+                    <div id="inf-progress-fill" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(59, 130, 246, 0.4); transition: width 0.1s linear; pointer-events: none;"></div>
+                    <span id="inf-generate-text" style="position: relative; z-index: 2;">Generate Image</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Column: Gallery -->
+        <div style="flex: 1; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #000; position: relative;" id="inf-canvas-container">
+                <img id="inf-canvas-img" style="max-width: 100%; max-height: 100%; object-fit: contain; display: none;" src="">
+                <div id="inf-canvas-empty" style="color: var(--text-muted); font-size: 1.1rem; font-weight: 500;">No Output</div>
+            </div>
+            <div style="height: 130px; border-top: 1px solid var(--border); padding: 10px; display: flex; gap: 10px; overflow-x: auto; background: var(--surface-hover);" id="inf-gallery">
+            </div>
+        </div>
+    </div>
+    
+    <!-- End Main Content -->
+    </div>
+
+    <script>
+        // Global State
+        let activeModels = {}; 
+        let currentModalModel = null;
+        let currentModalVersion = null;
+        window.isVaultMode = false;
+        window.currentVaultFilename = null;
+        window.currentVaultCategory = null;
+        window.availableLoras = [];
+        window.comfyUploadedImg2Img = null;
+        window.comfyUploadedCn = null;
+        
+        async function uploadFileToProxy(file) {
+            document.getElementById('inf-generate-btn').disabled = true;
+            document.getElementById('inf-generate-text').innerText = "Uploading Image to Engine...";
+            
+            const formData = new FormData();
+            formData.append("image", file);
+            try {
+                const res = await fetch('/api/comfy_upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                document.getElementById('inf-generate-btn').disabled = false;
+                document.getElementById('inf-generate-text').innerText = "Generate Image";
+                return data.name; 
+            } catch(e) {
+                alert("Engine upload failed! Is it running?");
+                document.getElementById('inf-generate-btn').disabled = false;
+                document.getElementById('inf-generate-text').innerText = "Generate Image";
+                return null;
+            }
+        }
+
+        async function handleImg2ImgUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const prev = document.getElementById('inf-img2img-preview');
+                prev.src = ev.target.result;
+                prev.style.display = 'block';
+                document.getElementById('inf-img2img-text').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+            window.comfyUploadedImg2Img = await uploadFileToProxy(file);
+        }
+        
+        function clearImg2Img() {
+            window.comfyUploadedImg2Img = null;
+            document.getElementById('inf-img2img-file').value = "";
+            document.getElementById('inf-img2img-preview').style.display = 'none';
+            document.getElementById('inf-img2img-text').style.display = 'block';
+        }
+
+        async function handleCnUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const prev = document.getElementById('inf-cn-preview');
+                prev.src = ev.target.result;
+                prev.style.display = 'block';
+                document.getElementById('inf-cn-text').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+            window.comfyUploadedCn = await uploadFileToProxy(file);
+        }
+
+        function addLoraSlot() {
+            const container = document.getElementById('inf-lora-container');
+            const row = document.createElement('div');
+            row.style.cssText = "display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid var(--border);";
+            
+            const select = document.createElement('select');
+            select.className = "select-fancy lora-select";
+            select.style.flex = "2";
+            window.availableLoras.forEach(l => {
+                const opt = document.createElement('option');
+                opt.value = l.filename;
+                opt.innerText = (l.metadata?.model?.name ? (l.metadata.model.name + " (" + l.filename + ")") : l.filename);
+                select.appendChild(opt);
+            });
+            
+            const weight = document.createElement('input');
+            weight.type = "number";
+            weight.className = "select-fancy lora-weight";
+            weight.style.flex = "1";
+            weight.value = "1.0";
+            weight.step = "0.05";
+            weight.min = "-2.0";
+            weight.max = "2.0";
+            weight.title = "LoRA Weight / Strength";
+            
+            const delBtn = document.createElement('button');
+            delBtn.innerText = "❌";
+            delBtn.style.cssText = "background: none; border: none; font-size: 1.0rem; cursor: pointer; color: #ef4444;";
+            delBtn.onclick = () => row.remove();
+            
+            row.appendChild(select);
+            row.appendChild(weight);
+            row.appendChild(delBtn);
+            container.appendChild(row);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            document.getElementById('view-explorer').style.display = 'none';
+            document.getElementById('view-vault').style.display = 'none';
+            document.getElementById('view-inference').style.display = 'none';
+            document.getElementById('view-appstore').style.display = 'none';
+            document.getElementById('view-packages').style.display = 'none';
+            
+            if(tabId === 'explorer') {
+                document.getElementById('view-explorer').style.display = 'block';
+                document.getElementById('page-title').innerText = 'Model Explorer';
+                document.getElementById('page-subtitle').innerText = 'Discover and download native models directly from CivitAI.';
+                if(Object.keys(activeModels).length === 0) loadExplorer();
+            } else if(tabId === 'inference') {
+                document.getElementById('view-inference').style.display = 'flex';
+                document.getElementById('page-title').innerText = 'Inference Studio';
+                document.getElementById('page-subtitle').innerText = 'Generate artwork identically to Stability Matrix natively driven by ComfyUI.';
+                initInferenceUI();
+            } else if(tabId === 'vault') {
+                document.getElementById('view-vault').style.display = 'block';
+                document.getElementById('page-title').innerText = 'Global Vault';
+                document.getElementById('page-subtitle').innerText = 'Managing your centralized AI assets.';
+                loadModels();
+            } else if (tabId === 'appstore') {
+                document.getElementById('view-appstore').style.display = 'block';
+                document.getElementById('page-title').innerText = 'App Store';
+                document.getElementById('page-subtitle').innerText = 'Install new Generative AI frameworks automatically.';
+                loadRecipes();
+            } else if (tabId === 'packages') {
+                document.getElementById('view-packages').style.display = 'block';
+                document.getElementById('page-title').innerText = 'Installed Packages';
+                document.getElementById('page-subtitle').innerText = 'Manage and launch your isolated AI UIs.';
+                loadPackages();
+            }
+        }
+
+        /* --- CivitAI Explorer Integration --- */
+        let installedHashes = new Set(); // To cross-check installed models
+        window.cardState = {}; // Carousel indexes
+        window.onlyNsfw = false;
+        
+        function handleNsfwClick(e) {
+            e.preventDefault();
+            const cb = document.getElementById('ex-nsfw');
+            cb.checked = !cb.checked;
+            window.onlyNsfw = cb.checked ? e.altKey : false;
+            loadExplorer();
+        }
+
+        async function loadExplorer() {
+            const grid = document.getElementById('explorer-grid');
+            grid.innerHTML = '<div class="empty-state">Fetching CivitAI Catalog...</div>';
+            
+            if(installedHashes.size === 0) {
+                try {
+                    const lres = await fetch('/api/models');
+                    const ldata = await lres.json();
+                    if(ldata.models) ldata.models.forEach(m => installedHashes.add(m.metadata?.model?.name || m.filename));
+                } catch(e) {}
+            }
+
+            const sort = document.getElementById('ex-sort').value;
+            if(sort === "Favorites") {
+                grid.innerHTML = '';
+                const favs = JSON.parse(localStorage.getItem('ai_favorites') || '{}');
+                const favItems = Object.values(favs);
+                if(favItems.length === 0) {
+                     grid.innerHTML = '<div class="empty-state">No Favorites saved yet! Click the star on a Model Card.</div>';
+                     return;
+                }
+                renderExplorerGrid(favItems);
+                return;
+            }
+
+            const q = document.getElementById('ex-search').value;
+            const type = document.getElementById('ex-type').value;
+            const base = document.getElementById('ex-base').value;
+            const nsfw = document.getElementById('ex-nsfw').checked ? 'true' : 'false';
+            const early = document.getElementById('ex-early').checked ? 'true' : 'false';
+
+            let url = new URL('https://civitai.com/api/v1/models');
+            url.searchParams.append('limit', '40');
+            url.searchParams.append('sort', sort);
+            url.searchParams.append('nsfw', nsfw);
+            if(early === 'true') url.searchParams.append('earlyAccess', 'true');
+            if(q) url.searchParams.append('query', q);
+            if(type) url.searchParams.append('types', type);
+            if(base) url.searchParams.append('baseModels', base);
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                renderExplorerGrid(data.items);
+            } catch(e) {
+                grid.innerHTML = `<div class="empty-state" style="color:#ef4444;">Failed to load API: ${e.message}</div>`;
+            }
+        }
+
+        function renderExplorerGrid(items) {
+            const grid = document.getElementById('explorer-grid');
+            grid.innerHTML = '';
+            if(!items || items.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No models found matching criteria.</div>';
+                return;
+            }
+
+            const hideInstalled = document.getElementById('ex-installed').checked;
+            const favs = JSON.parse(localStorage.getItem('ai_favorites') || '{}');
+            activeModels = {};
+            
+            items.forEach(model => {
+                if (hideInstalled && installedHashes.has(model.name)) return;
+                if (window.onlyNsfw && !model.nsfw) return;
+                
+                activeModels[model.id] = model;
+                window.cardState[model.id] = 0;
+                
+                let bgHtml = '';
+                let imgCount = 0;
+                if(model.modelVersions && model.modelVersions[0] && model.modelVersions[0].images) {
+                    const imgs = model.modelVersions[0].images;
+                    imgCount = imgs.length;
+                    const first = imgs[0];
+                    if(first) {
+                        if(first.type === "video") {
+                            bgHtml = `<video class="card-img" id="card-media-${model.id}" src="${first.url}" autoplay loop muted playsinline></video>`;
+                        } else {
+                            bgHtml = `<img class="card-img" id="card-media-${model.id}" src="${first.url}">`;
+                        }
+                    }
+                }
+                if(!bgHtml) bgHtml = `<img class="card-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100px' height='100px'><rect fill='%231e293b' width='100%' height='100%'/></svg>">`;
+                
+                const creatorName = (model.creator && model.creator.username) ? model.creator.username : 'Unknown';
+                const dl = (model.stats.downloadCount / 1000).toFixed(1) + 'k';
+                const isFav = !!favs[model.id];
+                
+                let carouselBtns = '';
+                if(imgCount > 1) {
+                    carouselBtns = `
+                        <button class="carousel-btn left" onclick="event.stopPropagation(); cycleImage(${model.id}, -1)">&lt;</button>
+                        <button class="carousel-btn right" onclick="event.stopPropagation(); cycleImage(${model.id}, 1)">&gt;</button>
+                    `;
+                }
+                
+                grid.innerHTML += `
+                    <div class="card" onclick="openLightbox(${model.id})">
+                        <div class="card-tags">
+                            <span class="badge type">${model.type}</span>
+                            <button class="fav-btn" onclick="event.stopPropagation(); toggleFavorite(${model.id})" style="margin-left:auto; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.1); border-radius:4px; cursor:pointer; font-size:1.1rem; line-height:1; padding:2px 6px; color: ${isFav ? '#fbbf24' : 'rgba(255,255,255,0.4)'}; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">★</button>
+                        </div>
+                        <div class="card-img-container">
+                            ${bgHtml}
+                            ${carouselBtns}
+                        </div>
+                        <div class="card-banner">
+                            <h3>${model.name}</h3>
+                            <div class="card-meta-row">
+                                <span>${creatorName}</span>
+                                <span>Downloads: ${dl}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleFavorite(modelId) {
+            const m = activeModels[modelId];
+            if(!m) return;
+            let favs = JSON.parse(localStorage.getItem('ai_favorites') || '{}');
+            if(favs[modelId]) {
+                delete favs[modelId];
+            } else {
+                favs[modelId] = m;
+            }
+            localStorage.setItem('ai_favorites', JSON.stringify(favs));
+            loadExplorer();
+        }
+
+        function cycleImage(modelId, step) {
+            const m = activeModels[modelId];
+            if(!m) return;
+            const imgs = m.modelVersions[0].images;
+            if(!imgs || imgs.length === 0) return;
+            
+            let current = window.cardState[modelId] || 0;
+            current += step;
+            if(current < 0) current = imgs.length - 1;
+            if(current >= imgs.length) current = 0;
+            
+            window.cardState[modelId] = current;
+            const target = imgs[current];
+            const el = document.getElementById('card-media-' + modelId);
+            if(el) {
+                const parent = el.parentElement;
+                let bgHtml = '';
+                if(target.type === "video") {
+                    bgHtml = `<video class="card-img" id="card-media-${modelId}" src="${target.url}" autoplay loop muted playsinline></video>`;
+                } else {
+                    bgHtml = `<img class="card-img" id="card-media-${modelId}" src="${target.url}">`;
+                }
+                el.outerHTML = bgHtml;
+            }
+        }
+
+        function openLightbox(modelId, localFile = null, localCategory = null) {
+            window.isVaultMode = !!localFile;
+            window.currentVaultFilename = localFile;
+            window.currentVaultCategory = localCategory;
+            
+            const m = activeModels[modelId];
+            if(!m) return;
+            currentModalModel = m;
+            
+            document.getElementById('lb-title').innerText = m.name;
+            document.getElementById('lb-creator').innerText = `by ${m.creator ? m.creator.username : 'Unknown'}`;
+            document.getElementById('lb-civitai-link').href = `https://civitai.com/models/${m.id}`;
+            
+            // Populate versions
+            const select = document.getElementById('lb-version-select');
+            select.innerHTML = '';
+            m.modelVersions.forEach((v, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.innerText = `${v.name} (${v.baseModel})`;
+                select.appendChild(opt);
+            });
+            
+            // Load Tags
+            const tagsCont = document.getElementById('lb-tags-container');
+            tagsCont.innerHTML = '';
+            (m.tags || []).slice(0, 8).forEach(t => {
+                tagsCont.innerHTML += `<span class="badge" style="background:var(--surface-hover);">${t}</span>`;
+            });
+
+            document.getElementById('lightbox').style.display = 'flex';
+            updateLightboxVersion();
+        }
+
+        window.lbImageIndex = 0;
+
+        function updateLightboxVersion() {
+            const index = document.getElementById('lb-version-select').value;
+            currentModalVersion = currentModalModel.modelVersions[index];
+            window.lbImageIndex = 0; // reset index for new version
+            
+            const v = currentModalVersion;
+            const trigCont = document.getElementById('lb-trigger-container');
+            const trig = document.getElementById('lb-triggers');
+            if(v.trainedWords && v.trainedWords.length > 0) {
+                trigCont.style.display = 'block';
+                trig.innerText = v.trainedWords.join(", ");
+            } else {
+                trigCont.style.display = 'none';
+            }
+            
+            // Download UI Binding
+            let mainFile = v.files.find(f => f.primary) || v.files[0];
+            const btn = document.getElementById('lb-download-btn');
+            const meta = document.getElementById('lb-download-meta');
+            
+            if(mainFile) {
+                const mb = (mainFile.sizeKB / 1024).toFixed(1);
+                btn.innerText = `Download ${mainFile.name}`;
+                meta.innerText = `${mainFile.type} Format • ${mb} MB`;
+                btn.disabled = false;
+            } else {
+                btn.innerText = "No Files Available";
+                meta.innerText = "";
+                btn.disabled = true;
+            }
+
+            renderLightboxImage();
+        }
+
+        function cycleLightboxImage(step) {
+            const v = currentModalVersion;
+            if(!v || !v.images || v.images.length === 0) return;
+            window.lbImageIndex += step;
+            if(window.lbImageIndex < 0) window.lbImageIndex = v.images.length - 1;
+            if(window.lbImageIndex >= v.images.length) window.lbImageIndex = 0;
+            renderLightboxImage();
+        }
+
+        function renderLightboxImage() {
+            const v = currentModalVersion;
+            if(v && v.images && v.images.length > 0) {
+                const img = v.images[window.lbImageIndex];
+                const wrap = document.getElementById('lb-gallery-wrapper');
+                if(img.type === "video") {
+                    wrap.innerHTML = `<video style="max-width:100%; max-height:100%; object-fit:contain;" src="${img.url}" autoplay loop muted playsinline></video>`;
+                } else {
+                    wrap.innerHTML = `<img style="max-width:100%; max-height:100%; object-fit:contain;" src="${img.url}">`;
+                }
+
+                // Metadata injection
+                const metaCont = document.getElementById('lb-meta-container');
+                const metaDiv = document.getElementById('lb-metadata');
+                if(img.meta && Object.keys(img.meta).length > 0) {
+                    metaCont.style.display = 'block';
+                    let h = '';
+                    if(img.meta.prompt) h += `<div style="margin-bottom:8px;"><strong>Prompt:</strong> ${img.meta.prompt}</div>`;
+                    if(img.meta.negativePrompt) h += `<div style="margin-bottom:8px;"><strong>Negative:</strong> ${img.meta.negativePrompt}</div>`;
+                    let pills = '';
+                    if(img.meta.sampler) pills += `<span class="meta-pill">Sampler: ${img.meta.sampler}</span>`;
+                    if(img.meta.cfgScale) pills += `<span class="meta-pill">CFG: ${img.meta.cfgScale}</span>`;
+                    if(img.meta.steps) pills += `<span class="meta-pill">Steps: ${img.meta.steps}</span>`;
+                    if(img.meta.seed) pills += `<span class="meta-pill">Seed: ${img.meta.seed}</span>`;
+                    if(pills) h += `<div style="margin-top:10px;">${pills}</div>`;
+                    metaDiv.innerHTML = h || 'No render metrics attached.';
+                } else {
+                    metaCont.style.display = 'none';
+                }
+            } else {
+                document.getElementById('lb-gallery-wrapper').innerHTML = '';
+            }
+
+            const trigCont = document.getElementById('lb-trigger-container');
+            const trig = document.getElementById('lb-triggers');
+            if(v.trainedWords && v.trainedWords.length > 0) {
+                trigCont.style.display = 'block';
+                trig.innerText = v.trainedWords.join(", ");
+            } else {
+                trigCont.style.display = 'none';
+            }
+            
+            // Download UI Binding
+            let mainFile = v.files.find(f => f.primary) || v.files[0];
+            const btnStandard = document.getElementById('lb-actions-standard');
+            const btnVault = document.getElementById('lb-actions-vault');
+            const btnDl = document.getElementById('lb-download-btn');
+            const meta = document.getElementById('lb-download-meta');
+            
+            if(window.isVaultMode) {
+                btnStandard.style.display = 'none';
+                btnVault.style.display = 'flex';
+            } else {
+                btnStandard.style.display = 'block';
+                btnVault.style.display = 'none';
+                if(mainFile) {
+                    const mb = (mainFile.sizeKB / 1024).toFixed(1);
+                    btnDl.innerText = `Download ${mainFile.name}`;
+                    meta.innerText = `${mainFile.type} Format • ${mb} MB`;
+                    btnDl.disabled = false;
+                } else {
+                    btnDl.innerText = "No Files Available";
+                    meta.innerText = "";
+                    btnDl.disabled = true;
+                }
+            }
+        }
+        
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        async function executeDownload() {
+            const m = currentModalModel;
+            const v = currentModalVersion;
+            const mainFile = v.files.find(f => f.primary) || v.files[0];
+            
+            if(!mainFile) return;
+
+            // Mapping Model Type to Vault Tier
+            const typeMap = {
+                "Checkpoint": "checkpoints",
+                "LORA": "loras",
+                "TextualInversion": "embeddings",
+                "Controlnet": "controlnet",
+                "VAE": "vaes"
+            };
+            const tier = typeMap[m.type] || "other";
+            const destFolder = `Global_Vault/${tier}`;
+            
+            const dlUrl = mainFile.downloadUrl + "?type=Model&format=SafeTensor"; 
+            
+            closeLightbox();
+            
+            try {
+                const res = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        url: dlUrl,
+                        filename: mainFile.name,
+                        model_name: m.name,
+                        dest_folder: destFolder
+                    })
+                });
+                const response = await res.json();
+                if(response.status !== 'success') {
+                    alert("Download rejected: " + response.message);
+                }
+            } catch(e) {
+                alert("Server request failed");
+            }
+        }
+
+        async function executeVaultOpenFolder() {
+            if(!window.currentVaultCategory) return;
+            try {
+                await fetch('/api/open_folder', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({category: window.currentVaultCategory})
+                });
+            } catch(e) {}
+        }
+        
+        async function executeVaultDelete() {
+            if(!confirm(`Permanently delete ${window.currentVaultFilename}?`)) return;
+            try {
+                const res = await fetch('/api/delete_model', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: window.currentVaultFilename, category: window.currentVaultCategory})
+                });
+                const response = await res.json();
+                if(response.status === 'success') {
+                    closeLightbox();
+                    loadModels();
+                } else alert(response.message);
+            } catch(e) { alert("Failed to delete"); }
+        }
+
+        async function executeVaultRedownload() {
+            if(!confirm(`Redownload ${window.currentVaultFilename}? This will delete the local file and recreate it.`)) return;
+            document.getElementById('lightbox').style.pointerEvents = 'none';
+            document.getElementById('lightbox').style.opacity = '0.5';
+            
+            try {
+                await fetch('/api/delete_model', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: window.currentVaultFilename, category: window.currentVaultCategory})
+                });
+                document.getElementById('lightbox').style.pointerEvents = 'auto';
+                document.getElementById('lightbox').style.opacity = '1';
+                executeDownload();
+            } catch(e) { 
+                document.getElementById('lightbox').style.pointerEvents = 'auto';
+                document.getElementById('lightbox').style.opacity = '1';
+            }
+        }
+
+        /* --- Local Vault & App Store --- */
+        async function loadModels() {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                
+                const grid = document.getElementById('models-grid');
+                grid.innerHTML = '';
+                
+                if(!data.models || data.models.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No models found in the database. Run the Vault Crawler!</div>';
+                    return;
+                }
+
+                data.models.forEach(m => {
+                    const fallbackImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect fill="%231e293b" width="100" height="100"/><text fill="%2394a3b8" x="50" y="50" font-family="sans-serif" font-size="10" text-anchor="middle" dominant-baseline="middle">No Preview</text></svg>`;
+                    const imgSrc = m.thumbnail_path ? '/' + m.thumbnail_path.replace(/\\/g, '/') : fallbackImg;
+                    const displayName = m.metadata?.model?.name || m.filename;
+                    
+                    let clickStr = '';
+                    if(m.metadata && m.metadata.modelId) {
+                        const fakeParent = {
+                            id: m.metadata.modelId,
+                            name: m.metadata.model ? m.metadata.model.name : m.filename,
+                            type: m.metadata.model ? m.metadata.model.type : "Unknown",
+                            creator: { username: "Local Vault" },
+                            tags: [],
+                            modelVersions: [ m.metadata ] // wrap the version to trick the lightbox
+                        };
+                        activeModels[fakeParent.id] = fakeParent;
+                        window.cardState[fakeParent.id] = 0;
+                        clickStr = `onclick="openLightbox(${fakeParent.id}, '${m.filename}', '${m.vault_category}')" style="cursor:pointer;"`;
+                    }
+                    
+                    grid.innerHTML += `
+                        <div class="card" ${clickStr}>
+                            <div class="card-img-container" style="padding-top:100%;">
+                                <img class="card-img" src="${imgSrc}" onerror="this.src='${fallbackImg}'">
+                            </div>
+                            <div class="card-banner" style="position:relative; background:var(--surface);">
+                                <span class="badge" style="background:var(--primary); margin-bottom:5px; display:inline-block;">${m.vault_category}</span>
+                                <h3>${displayName}</h3>
+                                <div class="card-meta-row" style="color:var(--text-muted);">
+                                    <span>${m.filename}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadPackages() {
+            try {
+                const res = await fetch('/api/packages');
+                const data = await res.json();
+                const grid = document.getElementById('packages-grid');
+                grid.innerHTML = '';
+                
+                if(!data.packages || data.packages.length === 0) {
+                    grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">No packages installed yet. Visit the App Store!</div>';
+                    return;
+                }
+
+                data.packages.forEach(p => {
+                    let runBtns = p.is_running ? `
+                        <button onclick="stopPackage('${p.id}')" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Stop Process</button>
+                        <button onclick="restartPackage('${p.id}')" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Restart Engine</button>
+                    ` : `
+                        <button onclick="launchPackage('${p.id}')" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Launch UI</button>
+                    `;
+                    grid.innerHTML += `
+                        <div class="std-card">
+                            <h3 class="card-title">${p.name}</h3>
+                            <div style="margin-top: 15px; display:flex; gap:10px;">
+                                ${runBtns}
+                                <button onclick="uninstallPackage('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Uninstall</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadRecipes() {
+            try {
+                const res = await fetch('/api/recipes');
+                const data = await res.json();
+                const grid = document.getElementById('recipes-grid');
+                grid.innerHTML = '';
+                
+                if(!data.recipes || data.recipes.length === 0) {
+                    grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">No recipes found in .backend/recipes/</div>';
+                    return;
+                }
+
+                data.recipes.forEach(r => {
+                    grid.innerHTML += `
+                        <div class="std-card">
+                            <h3 class="card-title">${r.name}</h3>
+                            <p class="subtitle" style="font-size: 0.85rem; margin-bottom: 15px;">Automated strict environment setup mapping to Global Vault.</p>
+                            <div>
+                                <button onclick="installRecipe('${r.id}')" style="background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Install Sandbox</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function installRecipe(recipeId) {
+            const btn = event.currentTarget;
+            btn.innerText = "Starting...";
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/install', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({recipe_id: recipeId})
+                });
+                const response = await res.json();
+                if(response.status === 'success') {
+                    btn.innerText = "Installing (Check Console)";
+                } else {
+                    btn.innerText = "Error"; alert(response.message);
+                }
+            } catch(e) {
+                alert("Failed to contact server");
+                btn.innerText = "Install Sandbox";
+                btn.disabled = false;
+            }
+        }
+
+        async function launchPackage(packageId) {
+            const btn = event.currentTarget;
+            const originalText = btn.innerText;
+            btn.innerText = "Launching...";
+            try {
+                const res = await fetch('/api/launch', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({package_id: packageId})
+                });
+                const response = await res.json();
+                if(response.status === 'success') loadPackages();
+                else alert(response.message);
+            } catch(e) { alert("Failed to contact server"); }
+            setTimeout(() => btn.innerText = originalText, 2000);
+        }
+
+        async function stopPackage(packageId) {
+            const btn = event.currentTarget;
+            const originalText = btn.innerText;
+            btn.innerText = "Stopping...";
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/stop', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({package_id: packageId})
+                });
+                await res.json();
+                loadPackages();
+            } catch(e) {
+                alert("Failed to contact server");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        async function restartPackage(packageId) {
+            const btn = event.currentTarget;
+            const originalText = btn.innerText;
+            btn.innerText = "Restarting...";
+            btn.disabled = true;
+            try {
+                await fetch('/api/stop', { method: 'POST', body: JSON.stringify({package_id: packageId}), headers: {'Content-Type': 'application/json'} });
+                await fetch('/api/launch', { method: 'POST', body: JSON.stringify({package_id: packageId}), headers: {'Content-Type': 'application/json'} });
+                setTimeout(loadPackages, 1500);
+            } catch(e) {
+                alert("Failed to restart!");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function uninstallPackage(packageId) {
+            if(!confirm("Are you sure you want to permanently delete " + packageId + "?\n\nNote: Your Global Vault models are safe and will NOT be deleted.")) return;
+            const btn = event.currentTarget;
+            const originalText = btn.innerText;
+            btn.innerText = "Uninstalling...";
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/uninstall', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({package_id: packageId})
+                });
+                const response = await res.json();
+                if(response.status === 'success') loadPackages();
+                else { alert(response.message); btn.innerText = "Error"; }
+            } catch(e) {
+                alert("Failed to contact server");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        /* --- Inference Studio UI Engine --- */
+        async function extractComfyMetadata(blob) {
+            const buf = await blob.arrayBuffer();
+            const view = new DataView(buf);
+            let offset = 8;
+            while(offset < view.byteLength) {
+                 const length = view.getUint32(offset);
+                 offset += 4;
+                 const type = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3));
+                 offset += 4;
+                 if(type === 'tEXt') {
+                     const data = new Uint8Array(buf, offset, length);
+                     const text = new TextDecoder().decode(data);
+                     const split = text.indexOf('\0');
+                     if(text.substring(0, split) === 'prompt') return JSON.parse(text.substring(split + 1));
+                 }
+                 offset += length + 4;
+            }
+            return null;
+        }
+
+        async function restoreMetadataFromDrop(e) {
+            let file = null;
+            if(e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                file = e.dataTransfer.files[0];
+            } else {
+                const url = e.dataTransfer.getData('text/plain');
+                if(!url) return;
+                const res = await fetch(url);
+                file = await res.blob();
+            }
+            if(!file) return;
+
+            const promptObj = await extractComfyMetadata(file);
+            if(!promptObj) {
+                alert("This PNG image does not contain AIManager/ComfyUI generative metadata.");
+                return;
+            }
+            
+            repopulateUI(promptObj);
+        }
+
+        function repopulateUI(promptObj) {
+            let cModel="", cSampler="", cScheduler="", cSteps=20, cCfg=7.0, cWidth=1024, cHeight=1024, cSeed=-1, cPrompt="", cNeg="";
+            let cVae="none", cRefiner="none", cRefSteps=10, cDenoise=1.0;
+            let cHiresEnable = false, cHiresUpType = "latent", cHiresSteps = 10, cHiresFactor = 1.5, cHiresDenoise = 0.4;
+            let loras = [];
+            
+            for(const nodeId in promptObj) {
+                const node = promptObj[nodeId];
+                if(node.class_type === "CheckpointLoaderSimple") {
+                    if(nodeId === "4") cModel = node.inputs.ckpt_name;
+                    if(nodeId === "202") cRefiner = node.inputs.ckpt_name;
+                }
+                if(node.class_type === "VAELoader") cVae = node.inputs.vae_name;
+                if(node.class_type === "EmptyLatentImage") {
+                    cWidth = node.inputs.width;
+                    cHeight = node.inputs.height;
+                }
+                if(node.class_type === "KSampler" || node.class_type === "KSamplerAdvanced") {
+                    if(nodeId === "3") { // Base Sampler
+                        cSeed = node.inputs.seed || node.inputs.noise_seed;
+                        cSteps = node.inputs.steps;
+                        cCfg = node.inputs.cfg;
+                        cSampler = node.inputs.sampler_name;
+                        cScheduler = node.inputs.scheduler;
+                    }
+                    if(nodeId === "205") cRefSteps = node.inputs.steps - cSteps; // KSamplerAdvanced Refiner
+                    if(nodeId === "201" || nodeId === "305") { // Hires KSampler
+                        cHiresEnable = true;
+                        cHiresSteps = node.inputs.steps;
+                        cHiresDenoise = node.inputs.denoise;
+                    }
+                }
+                if(node.class_type === "CLIPTextEncode") {
+                    if(nodeId === "6") cPrompt = node.inputs.text;
+                    if(nodeId === "7") cNeg = node.inputs.text;
+                }
+                if(node.class_type === "LoraLoader") {
+                    loras.push({ name: node.inputs.lora_name, weight: node.inputs.strength_model });
+                }
+                if(node.class_type === "LatentUpscaleBy") {
+                    cHiresEnable = true; cHiresUpType = "latent"; cHiresFactor = node.inputs.scale_by;
+                }
+                if(node.class_type === "ImageScaleBy") {
+                    cHiresEnable = true; cHiresUpType = "esrgan"; cHiresFactor = node.inputs.scale_by;
+                }
+            }
+            
+            // Assign fields safely checking bounds
+            if(cModel) document.getElementById('inf-model').value = cModel;
+            if(cRefiner) document.getElementById('inf-refiner').value = cRefiner;
+            if(cVae) document.getElementById('inf-vae').value = cVae;
+            
+            document.getElementById('inf-prompt').value = cPrompt;
+            document.getElementById('inf-negative').value = cNeg;
+            document.getElementById('inf-seed').value = cSeed;
+            document.getElementById('inf-steps').value = cSteps;
+            document.getElementById('inf-refiner-steps').value = cRefSteps;
+            document.getElementById('inf-cfg').value = cCfg;
+            document.getElementById('inf-sampler').value = cSampler;
+            document.getElementById('inf-scheduler').value = cScheduler;
+            document.getElementById('inf-width').value = cWidth;
+            document.getElementById('inf-height').value = cHeight;
+            
+            document.getElementById('inf-hires-enable').checked = cHiresEnable;
+            if(cHiresEnable) {
+                document.getElementById('inf-hires-upscaler').value = cHiresUpType;
+                document.getElementById('inf-hires-steps').value = cHiresSteps;
+                document.getElementById('inf-hires-factor').value = cHiresFactor;
+                document.getElementById('inf-hires-denoise').value = cHiresDenoise;
+                document.getElementById('inf-hires-container').style.display = 'flex';
+            } else {
+                document.getElementById('inf-hires-container').style.display = 'none';
+            }
+            
+            // Restore LoRAs natively
+            const lCont = document.getElementById('inf-lora-container');
+            lCont.innerHTML = '';
+            loras.forEach(l => {
+                addLoraSlot();
+                const rows = lCont.querySelectorAll('.lora-select');
+                rows[rows.length-1].value = l.name;
+                const weights = lCont.querySelectorAll('.lora-weight');
+                weights[weights.length-1].value = l.weight;
+            });
+            
+            alert("Settings successfully restored from image metadata!");
+        }
+
+        async function initInferenceUI() {
+            // Check ComfyUI server status
+            try {
+                const res = await fetch('/api/comfy_proxy', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({endpoint: '/system_stats'}) });
+                if(!res.ok) throw new Error("Offline");
+                document.getElementById('inf-launch-btn').innerText = "Backend Connected 🟢";
+                document.getElementById('inf-launch-btn').style.color = "#4ade80";
+            } catch(e) {
+                document.getElementById('inf-launch-btn').innerText = "Launch Engine";
+                document.getElementById('inf-launch-btn').style.color = "#cbd5e1";
+                
+                // Lazily autostart if clicking Inference
+                if(document.getElementById('inf-launch-btn').innerText !== "Starting...") {
+                    launchComfyUI();
+                }
+            }
+            
+            // Populate Models natively from vault
+            fetch('/api/models').then(r => r.json()).then(data => {
+                if(!data.models) return;
+                
+                const ddw = document.getElementById('inf-model');
+                const lastVal = ddw.value;
+                ddw.innerHTML = '';
+                
+                const ref = document.getElementById('inf-refiner');
+                const lastRef = ref.value;
+                ref.innerHTML = '<option value="none">None</option>';
+                
+                const vae = document.getElementById('inf-vae');
+                const lastVae = vae.value;
+                vae.innerHTML = '<option value="none">Baked VAE</option>';
+
+                window.availableLoras = data.models.filter(m => m.vault_category === 'loras');
+                
+                data.models.filter(m => m.vault_category === 'checkpoints').forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.filename;
+                    opt.innerText = (m.metadata?.model?.name ? (m.metadata.model.name + " (" + m.filename + ")") : m.filename);
+                    ddw.appendChild(opt);
+                    
+                    const optRef = opt.cloneNode(true);
+                    ref.appendChild(optRef);
+                });
+                
+                data.models.filter(m => m.vault_category === 'vae').forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.filename;
+                    opt.innerText = (m.metadata?.model?.name ? (m.metadata.model.name + " (" + m.filename + ")") : m.filename);
+                    vae.appendChild(opt);
+                });
+                
+                const cnd = document.getElementById('inf-cn-model');
+                cnd.innerHTML = '<option value="">Select ControlNet Model...</option>';
+                data.models.filter(m => m.vault_category === 'controlnet').forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.filename;
+                    opt.innerText = (m.metadata?.model?.name ? (m.metadata.model.name + " (" + m.filename + ")") : m.filename);
+                    cnd.appendChild(opt);
+                });
+
+                if(lastVal) ddw.value = lastVal;
+                if(lastRef) ref.value = lastRef;
+                if(lastVae) vae.value = lastVae;
+            });
+        }
+
+        async function launchComfyUI() {
+            try {
+                const btn = document.getElementById('inf-launch-btn');
+                btn.innerText = "Starting...";
+                btn.style.color = "#fbbf24";
+                await fetch('/api/launch', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({package_id: 'ComfyUI'})
+                });
+                let retries = 0;
+                const poll = setInterval(async () => {
+                    try {
+                        const res = await fetch('/api/comfy_proxy', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({endpoint: '/system_stats'}) });
+                        if(res.ok) {
+                            clearInterval(poll);
+                            initInferenceUI();
+                        }
+                    } catch(e) {
+                        retries++;
+                        if(retries > 30) clearInterval(poll); // give up after 30s
+                    }
+                }, 1000);
+            } catch(e) { alert("Failed to launch ComfyUI"); }
+        }
+
+        async function executeInference() {
+            const ckpt_name = document.getElementById('inf-model').value;
+            const refiner_name = document.getElementById('inf-refiner').value;
+            const vae_name = document.getElementById('inf-vae').value;
+            const prompt = document.getElementById('inf-prompt').value;
+            const negative = document.getElementById('inf-negative').value;
+            const seed = parseInt(document.getElementById('inf-seed').value);
+            const actualSeed = seed === -1 ? Math.floor(Math.random() * 1e15) : seed;
+            const steps = parseInt(document.getElementById('inf-steps').value);
+            const refiner_steps = parseInt(document.getElementById('inf-refiner-steps').value);
+            const cfg = parseFloat(document.getElementById('inf-cfg').value);
+            const sampler_name = document.getElementById('inf-sampler').value;
+            const scheduler = document.getElementById('inf-scheduler').value;
+            const width = parseInt(document.getElementById('inf-width').value);
+            const height = parseInt(document.getElementById('inf-height').value);
+            
+            if(!ckpt_name) return alert("Select a Checkpoint model first!");
+
+            let currentModelSource = [ "4", 0 ];
+            let currentClipSource = [ "4", 1 ];
+            let currentVaeSource = [ "4", 2 ];
+            
+            const workflow = {
+              "4": { "inputs": { "ckpt_name": ckpt_name }, "class_type": "CheckpointLoaderSimple" },
+              "5": { "inputs": { "width": width, "height": height, "batch_size": 1 }, "class_type": "EmptyLatentImage" }
+            };
+            
+            if(vae_name && vae_name !== 'none') {
+                workflow["100"] = { "inputs": { "vae_name": vae_name }, "class_type": "VAELoader" };
+                currentVaeSource = [ "100", 0 ];
+            }
+            
+            // LoRAs
+            const loraRows = document.querySelectorAll('#inf-lora-container > div');
+            let loraIndex = 110;
+            loraRows.forEach(row => {
+               const lName = row.querySelector('.lora-select').value;
+               const lWeight = parseFloat(row.querySelector('.lora-weight').value);
+               workflow[loraIndex.toString()] = {
+                   "inputs": { "lora_name": lName, "strength_model": lWeight, "strength_clip": lWeight, "model": currentModelSource, "clip": currentClipSource },
+                   "class_type": "LoraLoader"
+               };
+               currentModelSource = [loraIndex.toString(), 0];
+               currentClipSource = [loraIndex.toString(), 1];
+               loraIndex++;
+            });
+            
+            workflow["6"] = { "inputs": { "text": prompt, "clip": currentClipSource }, "class_type": "CLIPTextEncode" };
+            workflow["7"] = { "inputs": { "text": negative, "clip": currentClipSource }, "class_type": "CLIPTextEncode" };
+            
+            let posCond = [ "6", 0 ];
+            let negCond = [ "7", 0 ];
+            let finalLatentSource = [ "5", 0 ];
+            let denoiseParam = 1.0;
+
+            // Img2Img
+            if(window.comfyUploadedImg2Img) {
+                denoiseParam = parseFloat(document.getElementById('inf-img2img-denoise').value);
+                workflow["1001"] = { "inputs": { "image": window.comfyUploadedImg2Img }, "class_type": "LoadImage" };
+                workflow["1002"] = { "inputs": { "pixels": [ "1001", 0 ], "vae": currentVaeSource }, "class_type": "VAEEncode" };
+                finalLatentSource = [ "1002", 0 ];
+            }
+
+            // ControlNet
+            const cnEnable = document.getElementById('inf-cn-enable').checked;
+            const cnModel = document.getElementById('inf-cn-model').value;
+            if(cnEnable && cnModel && window.comfyUploadedCn) {
+                const cnStrength = parseFloat(document.getElementById('inf-cn-strength').value);
+                workflow["1003"] = { "inputs": { "control_net_name": cnModel }, "class_type": "ControlNetLoader" };
+                workflow["1004"] = { "inputs": { "image": window.comfyUploadedCn }, "class_type": "LoadImage" };
+                workflow["1005"] = {
+                    "inputs": { "strength": cnStrength, "positive": posCond, "negative": negCond, "control_net": [ "1003", 0 ], "image": [ "1004", 0 ] },
+                    "class_type": "ControlNetApplyAdvanced"
+                };
+                posCond = [ "1005", 0 ];
+                negCond = [ "1005", 1 ];
+            }
+
+            // Base Sampler Logic
+            let use_refiner = (refiner_name && refiner_name !== 'none');
+            
+            if(use_refiner) {
+                workflow["3"] = {
+                    "inputs": { "add_noise": "enable", "noise_seed": actualSeed, "steps": steps + refiner_steps, "cfg": cfg, "sampler_name": sampler_name, "scheduler": scheduler, "start_at_step": 0, "end_at_step": steps, "return_with_leftover_noise": "enable", "model": currentModelSource, "positive": posCond, "negative": negCond, "latent_image": finalLatentSource },
+                    "class_type": "KSamplerAdvanced"
+                };
+                workflow["202"] = { "inputs": { "ckpt_name": refiner_name }, "class_type": "CheckpointLoaderSimple" };
+                workflow["203"] = { "inputs": { "text": prompt, "clip": [ "202", 1 ] }, "class_type": "CLIPTextEncode" };
+                workflow["204"] = { "inputs": { "text": negative, "clip": [ "202", 1 ] }, "class_type": "CLIPTextEncode" };
+                workflow["205"] = {
+                    "inputs": { "add_noise": "disable", "noise_seed": actualSeed, "steps": steps + refiner_steps, "cfg": cfg, "sampler_name": sampler_name, "scheduler": scheduler, "start_at_step": steps, "end_at_step": 10000, "return_with_leftover_noise": "disable", "model": [ "202", 0 ], "positive": [ "203", 0 ], "negative": [ "204", 0 ], "latent_image": [ "3", 0 ] },
+                    "class_type": "KSamplerAdvanced"
+                };
+                finalLatentSource = [ "205", 0 ];
+            } else {
+                workflow["3"] = {
+                    "inputs": { "seed": actualSeed, "steps": steps, "cfg": cfg, "sampler_name": sampler_name, "scheduler": scheduler, "denoise": denoiseParam, "model": currentModelSource, "positive": posCond, "negative": negCond, "latent_image": finalLatentSource },
+                    "class_type": "KSampler"
+                };
+                finalLatentSource = [ "3", 0 ];
+            }
+
+            // High-Res Fix
+            const doHires = document.getElementById('inf-hires-enable').checked;
+            if(doHires) {
+                const hFactor = parseFloat(document.getElementById('inf-hires-factor').value);
+                const hDenoise = parseFloat(document.getElementById('inf-hires-denoise').value);
+                const hSteps = parseInt(document.getElementById('inf-hires-steps').value);
+                const hUpscaler = document.getElementById('inf-hires-upscaler').value;
+                let upscaledLatentSource;
+                
+                if(hUpscaler === 'latent') {
+                    workflow["300"] = { "inputs": { "upscale_method": "bilinear", "scale_by": hFactor, "samples": finalLatentSource }, "class_type": "LatentUpscaleBy" };
+                    upscaledLatentSource = [ "300", 0 ];
+                } else {
+                    workflow["301"] = { "inputs": { "samples": finalLatentSource, "vae": currentVaeSource }, "class_type": "VAEDecode" };
+                    workflow["302"] = { "inputs": { "upscale_method": "bicubic", "scale_by": hFactor, "image": [ "301", 0 ] }, "class_type": "ImageScaleBy" };
+                    workflow["303"] = { "inputs": { "pixels": [ "302", 0 ], "vae": currentVaeSource }, "class_type": "VAEEncode" };
+                    upscaledLatentSource = [ "303", 0 ];
+                }
+                workflow["305"] = {
+                    "inputs": { "seed": actualSeed + 1, "steps": hSteps, "cfg": cfg, "sampler_name": sampler_name, "scheduler": scheduler, "denoise": hDenoise, "model": currentModelSource, "positive": posCond, "negative": negCond, "latent_image": upscaledLatentSource },
+                    "class_type": "KSampler"
+                };
+                finalLatentSource = [ "305", 0 ];
+            }
+            
+            // Output Decode
+            workflow["8"] = { "inputs": { "samples": finalLatentSource, "vae": currentVaeSource }, "class_type": "VAEDecode" };
+            workflow["9"] = { "inputs": { "filename_prefix": "AIManager", "images": [ "8", 0 ] }, "class_type": "SaveImage" };
+            
+            const payload = { prompt: workflow };
+            
+            const btn = document.getElementById('inf-generate-btn');
+            const txt = document.getElementById('inf-generate-text');
+            const fill = document.getElementById('inf-progress-fill');
+            
+            fill.style.width = '0%';
+            btn.disabled = true;
+            txt.innerText = "Queueing...";
+            document.getElementById('inf-canvas-img').style.display = 'none';
+            document.getElementById('inf-canvas-empty').style.display = 'block';
+            document.getElementById('inf-canvas-empty').innerText = "Waking Engine...";
+
+            try {                
+                const res = await fetch('/api/comfy_proxy', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({endpoint: '/prompt', payload: payload})
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error.message || "Unknown ComfyUI Error");
+                
+                window.currentPromptId = data.prompt_id;
+                
+                // Fallback Polling Engine (In case WebSockets are hard-blocked by browser)
+                if(window.comfyPollInterval) clearInterval(window.comfyPollInterval);
+                document.getElementById('inf-generate-text').innerText = "Processing Canvas...";
+                
+                window.comfyPollInterval = setInterval(async () => {
+                    try {
+                        const histRes = await fetch('/api/comfy_proxy', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({endpoint: `/history/${window.currentPromptId}`})
+                        });
+                        const histData = await histRes.json();
+                        
+                        if(histData[window.currentPromptId]) {
+                            // Execution completed successfully!
+                            clearInterval(window.comfyPollInterval);
+                            const outputs = histData[window.currentPromptId].outputs;
+                            
+                            for(const nodeId in outputs) {
+                                if(outputs[nodeId].images && outputs[nodeId].images.length > 0) {
+                                    const imgData = outputs[nodeId].images[0];
+                                    const imgUrl = `/api/comfy_image?filename=${imgData.filename}&subfolder=${imgData.subfolder}&type=${imgData.type}&t=${Date.now()}`;
+                                    
+                                    const canvasImg = document.getElementById('inf-canvas-img');
+                                    canvasImg.src = imgUrl;
+                                    canvasImg.style.display = 'block';
+                                    document.getElementById('inf-canvas-empty').style.display = 'none';
+                                    
+                                    const gal = document.getElementById('inf-gallery');
+                                    const thumb = document.createElement('img');
+                                    thumb.src = imgUrl;
+                                    thumb.style.height = '100px';
+                                    thumb.style.borderRadius = '6px';
+                                    thumb.style.cursor = 'pointer';
+                                    thumb.style.border = '1px solid var(--border)';
+                                    thumb.onclick = () => canvasImg.src = imgUrl;
+                                    gal.insertBefore(thumb, gal.firstChild);
+                                    
+                                    document.getElementById('inf-generate-btn').disabled = false;
+                                    document.getElementById('inf-generate-text').innerText = "Generate Image";
+                                    document.getElementById('inf-progress-fill').style.width = '0%';
+                                    break;
+                                }
+                            }
+                        }
+                    } catch(e) { }
+                }, 1500); // 1.5s background interval
+
+            } catch(e) {
+                alert("Generation Failed: " + e.message + "\n\nIs ComfyUI running?");
+                btn.disabled = false;
+                txt.innerText = "Generate Image";
+                fill.style.width = '0%';
+                if(window.comfyPollInterval) clearInterval(window.comfyPollInterval);
+                document.getElementById('inf-canvas-empty').innerText = "No Output";
+            }
+        }
+
+        /* --- Download Polling Engine --- */
+        let knownCompletedJobs = new Set();
+
+        async function pollDownloads() {
+            try {
+                const res = await fetch('/api/downloads');
+                const jobs = await res.json();
+                const container = document.getElementById('active-downloads');
+                container.innerHTML = '';
+                
+                Object.keys(jobs).forEach(jobId => {
+                    const j = jobs[jobId];
+                    if(j.status === 'completed' || j.status === 'error') {
+                        if(j.status === 'completed' && !knownCompletedJobs.has(jobId)) {
+                            knownCompletedJobs.add(jobId);
+                            // Ensure the Python vault crawler has a second to finish parsing
+                            setTimeout(loadModels, 2000); 
+                        }
+                        return; // Hide finished
+                    }
+                    
+                    const progress = j.progress || 0;
+                    const statText = j.status === 'starting' ? 'Initializing...' : `${progress}%`;
+                    
+                    container.innerHTML += `
+                        <div class="download-toast">
+                            <div style="font-size:0.85rem; font-weight:600; margin-bottom:5px;">Downloading: ${j.model_name}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between;">
+                                <span>${j.filename}</span>
+                                <span>${statText}</span>
+                            </div>
+                            <div class="dl-bar-bg">
+                                <div class="dl-bar-fill" style="width: ${progress}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch(e) { }
+        }
+        
+        setInterval(pollDownloads, 1000); // 1-second background poll
+        
+        // Init
+        loadExplorer();
+
+    </script>
+</body>
+</html>

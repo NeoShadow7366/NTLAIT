@@ -1,0 +1,16 @@
+{
+  "app_id": "forge",
+  "name": "SD WebUI Forge",
+  "repository": "https://github.com/lllyasviel/stable-diffusion-webui-forge.git",
+  "install_commands": [
+    "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
+    "pip install -r requirements_versions.txt"
+  ],
+  "model_symlinks": {
+    "checkpoints": "models/Stable-diffusion",
+    "loras": "models/Lora",
+    "vaes": "models/VAE",
+    "controlnet": "models/ControlNet"
+  },
+  "launch_command": "launch.py --autolaunch"
+}

@@ -1,0 +1,18 @@
+{
+  "app_id": "auto1111",
+  "name": "Automatic1111 WebUI",
+  "repository": "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git",
+  "install_commands": [
+    "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
+    "pip install git+https://github.com/TencentARC/GFPGAN.git@8d2447a2d918f8eba5a4a01463fd48e45126a379",
+    "pip install git+https://github.com/openai/CLIP.git@d50d76daa670286dd6cacf3bcd80b5e4823fc8e1",
+    "pip install -r requirements_versions.txt"
+  ],
+  "model_symlinks": {
+    "checkpoints": "models/Stable-diffusion",
+    "loras": "models/Lora",
+    "vaes": "models/VAE",
+    "controlnet": "extensions/sd-webui-controlnet/models"
+  },
+  "launch_command": "launch.py --autolaunch"
+}
