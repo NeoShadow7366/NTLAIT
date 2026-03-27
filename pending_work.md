@@ -9,11 +9,12 @@ The core development cycle (Sprints 1–8) is finished. The application is featu
 
 ## 🔴 High Priority — Pre-Release Polish
 
-### E2E Test Suite Stabilization
-- Playwright E2E tests were scaffolded in Sprint 4 but have had intermittent flakiness
-- Strict mode selector violations need resolution
+### E2E Test Suite Stabilization ✅ (Fixed 2026-03-27)
+- ~~Playwright E2E tests were scaffolded in Sprint 4 but have had intermittent flakiness~~
+- ~~Strict mode selector violations need resolution~~
+- Three failures fixed: `exact=True` for Global Vault click, Settings tab navigation instead of defunct modal, theme DOM application
 - Video forensic tracing was added but needs validation on CI
-- **Action:** Run `/QA_Guardian_E2E_Run` workflow and fix any regressions
+- **Remaining:** Monitor CI runs to confirm green across all 6 matrix jobs (3 OS × 2 Python versions)
 
 ### Cross-Platform Verification
 - All code uses `os.name` / `platform.system()` branching but has only been tested on Windows
@@ -61,10 +62,10 @@ The core development cycle (Sprints 1–8) is finished. The application is featu
 
 ## 🟢 Low Priority — Nice-to-Have
 
-### Theming System
-- Settings has a theme dropdown but only dark mode is implemented
-- Add light mode CSS variables
-- Add accent color customization
+### Theming System (Partially Complete ✅)
+- Settings theme dropdown now applies `data-theme` attribute to `<body>` on save and load
+- Dark, Light, and Glass themes have CSS variable definitions
+- **Remaining:** Add accent color customization
 
 ### Notifications
 - Web Push notifications for completed downloads/generations
@@ -102,3 +103,4 @@ The core development cycle (Sprints 1–8) is finished. The application is featu
 |--------|-------------|------------|
 | 7 | 20 (prompts, bulk ops) | 20 |
 | 8 | 24 (clone tracker, export, dashboard, HTML) | 44 |
+| E2E fix | 5 existing tests stabilized | **49 total (all passing)** |
