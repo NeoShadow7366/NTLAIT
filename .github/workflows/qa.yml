@@ -38,7 +38,15 @@ jobs:
 
     - name: Execute Pytest with High Coverage
       run: |
-        python -m pytest .tests/ -v --cov=.backend/ --cov-report=xml --cov-report=term-missing
+        python -m pytest .tests/ -v --cov=.backend/ --cov-report=xml --cov-report=term-missing --tracing retain-on-failure --video retain-on-failure --screenshot only-on-failure
+
+    - name: Upload Playwright Forensic Traces
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: playwright-failure-traces-${{ matrix.os }}-${{ matrix.python-version }}
+        path: test-results/
+        retention-days: 7
 
     - name: Upload Local Coverage Artifact Pipeline
       uses: actions/upload-artifact@v4
