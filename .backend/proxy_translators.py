@@ -93,7 +93,7 @@ def build_comfy_workflow(payload: dict) -> dict:
         
         workflow["19"] = {"inputs": {"samples": ["18", 0], "vae": ["13", 0]}, "class_type": "VAEDecode"}
         workflow["20"] = {"inputs": {"filename_prefix": "AIManager_Flux", "images": ["19", 0]}, "class_type": "SaveImage"}
-        return workflow
+        return {"prompt": workflow}
 
     # ==========================
     # SD1.5 / SDXL PIPELINE

@@ -38,7 +38,7 @@ class VaultCrawler:
         file_path = os.path.join(root, filename)
         
         # Ensure we skip ignored files
-        if ".manager_ignore" in file_path:
+        if os.path.exists(os.path.join(root, ".manager_ignore")):
              return
              
         # Determine category based on the immediate folder inside Global_Vault

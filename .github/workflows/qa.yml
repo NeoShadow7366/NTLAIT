@@ -1,0 +1,46 @@
+name: Generative AI Manager - QA Guardian
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  build_and_test:
+    name: ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - name: Checkout Code Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip' # Automated caching saves network bandwidth per execution
+
+    - name: Install Pure QA Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r requirements-qa.txt
+
+    - name: Auto-Install Headless Playwright Drivers
+      run: |
+        python -m playwright install chromium
+
+    - name: Execute Pytest with High Coverage
+      run: |
+        python -m pytest .tests/ -v --cov=.backend/ --cov-report=xml --cov-report=term-missing
+
+    - name: Upload Local Coverage Artifact Pipeline
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-results-${{ matrix.os }}-${{ matrix.python-version }}
+        path: coverage.xml

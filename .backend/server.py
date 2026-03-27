@@ -4,6 +4,7 @@ import sqlite3
 import json
 import logging
 import subprocess
+import signal
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -74,9 +75,6 @@ class AIWebServer(BaseHTTPRequestHandler):
         if path == "/api/comfy_upload":
             self.handle_comfy_upload()
             return
-        if path == "/api/stop":
-            self.handle_stop()
-            return
         
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length > 0 else b"{}"
@@ -91,6 +89,8 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_install(data)
         elif path == "/api/launch":
             self.handle_launch(data)
+        elif path == "/api/stop":
+            self.handle_stop(data)
         elif path == "/api/uninstall":
             self.handle_uninstall(data)
         elif path == "/api/download":
@@ -374,10 +374,52 @@ class AIWebServer(BaseHTTPRequestHandler):
             
         # Combine command, e.g. python_exe main.py
         full_command = [python_exe] + launch_cmd.split(" ")
-        p = subprocess.Popen(full_command, cwd=app_path, stdout=log_file, stderr=subprocess.STDOUT)
+        
+        kwargs = {}
+        if os.name == 'nt':
+            kwargs['creationflags'] = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 512)
+            
+        p = subprocess.Popen(full_command, cwd=app_path, stdout=log_file, stderr=subprocess.STDOUT, **kwargs)
         AIWebServer.running_processes[package_id] = p
         
         self.send_json_response({"status": "success", "message": "Package starting..."})
+
+    def handle_stop(self, data=None):
+        if hasattr(self, 'path') and getattr(self, 'command', '') == 'GET':
+            # Handle GET requests if applicable (using query string)
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            package_id = qs.get("package_id", [""])[0]
+        else:
+            package_id = data.get("package_id") if data else None
+            
+        if not package_id:
+            self.send_json_response({"status": "error", "message": "Missing package_id"}, 400)
+            return
+
+        p = AIWebServer.running_processes.get(package_id)
+        if not p:
+            self.send_json_response({"status": "error", "message": "Package not running or not tracked"}, 404)
+            return
+
+        logging.info(f"Terminating package {package_id} (PID: {p.pid})...")
+        try:
+            if os.name == 'nt':
+                # Force kill the process tree on Windows
+                subprocess.run(['taskkill', '/F', '/T', '/PID', str(p.pid)], check=False)
+            else:
+                p.send_signal(signal.SIGTERM)
+                try:
+                    p.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    p.kill() # SIGKILL
+        except Exception as e:
+            logging.error(f"Error stopping package {package_id}: {e}")
+            self.send_json_response({"status": "error", "message": str(e)}, 500)
+            return
+            
+        del AIWebServer.running_processes[package_id]
+        self.send_json_response({"status": "success", "message": "Package stopped successfully"})
 
     def handle_uninstall(self, data):
         package_id = data.get("package_id")

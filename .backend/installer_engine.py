@@ -55,9 +55,10 @@ class RecipeInstaller:
         # 3. Virtual Environment Creation
         if not os.path.exists(venv_dir):
             logging.info(f"Creating strictly isolated Python VENV at {venv_dir}...")
-            # Real deployment would use self.root_dir/bin/python/python.exe
-            # For immediate safety we use the runtime python starting the script.
-            subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+            # Real deployment uses self.root_dir/bin/python/python.exe
+            portable_python = os.path.join(self.root_dir, "bin", "python", "python.exe") if os.name == 'nt' else os.path.join(self.root_dir, "bin", "python", "bin", "python")
+            python_exe = portable_python if os.path.exists(portable_python) else sys.executable
+            subprocess.run([python_exe, "-m", "venv", venv_dir], check=True)
         
         venv_python = self._get_python_executable(venv_dir)
 
