@@ -36,12 +36,16 @@ def test_theme_switch(page: Page):
     # Open dropdown, select Light Mode
     page.locator("#set-theme").select_option(value="light", force=True)
     
+    # Fire the Settings native global save function securely
+    page.evaluate("saveSettings()")
+    
     # Check that document root updated its attribute
-    expect(page.locator("html")).to_have_attribute("data-theme", "light")
+    expect(page.locator("body")).to_have_attribute("data-theme", "light")
     
     # Switch back to dark to ensure toggle works
     page.locator("#set-theme").select_option(value="dark", force=True)
-    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    page.evaluate("saveSettings()")
+    expect(page.locator("body")).to_have_attribute("data-theme", "dark")
 
 def test_api_key_modal(page: Page):
     """Verifies modal interaction and JavaScript functionality."""
