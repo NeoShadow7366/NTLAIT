@@ -199,13 +199,14 @@ IF command fails:
 
 #### Subprocess Failures
 ```
-IF subprocess.Popen fails:
+IF subprocess.Popen fails or crashes silently:
   1. Check if binary exists at expected path
-  2. Check if port is already bound (for engine launches)
-  3. IF process started but crashed:
-     → Read runtime.log tail (last 50 lines)
-     → Surface crash reason to UI
-  4. IF process is zombie:
+  2. PRE-FLIGHT CHECK: Automatically recover missing manifest.json and recreate missing Global_Vault symlinks before spawning.
+  3. SMART DIAGNOSTICS: If proxy connection is refused (URLError), `poll()` the process. If dead, read runtime.log tail.
+     → Search for `ModuleNotFoundError` or `ImportError`.
+     → Return structured `{"error": "engine_crashed", "missing_module": "..."}` to frontend.
+  4. UI AUTO-REPAIR: Frontend must halt polling and offer a one-click "Repair 🛠️" button that calls `/api/repair_dependency`.
+  5. IF process is zombie:
      → Force-kill via PID tracking (taskkill /F /T on Windows, SIGKILL on UNIX)
      → Clean up running_processes dict
 ```
@@ -233,6 +234,7 @@ IF sqlite3 operation fails:
 | Package installations | ❌ No | One install at a time to prevent pip lock conflicts |
 | Symlink creation | ❌ No | Sequential to prevent race conditions on directory creation |
 | Background embedding | ✅ Yes, but single model instance | SentenceTransformer is not thread-safe, use single worker loop |
+| Batch generation jobs | ❌ No | Sequential by design — one job at a time through `_batch_worker` |
 
 ### Skill Discovery
 
@@ -246,13 +248,14 @@ Available skills:
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| Universal Inference Router | `.agents/skills/universal_inference_router/` | Multi-engine payload translation and proxy dispatch |
+| Universal Inference Router | `.agents/skills/universal_inference_router/` | Multi-engine payload translation, proxy dispatch, and batch queue |
 | App Store Installer | `.agents/skills/app_store_installer/` | Config-driven app installation with isolated venvs |
 | Global Vault Symlinker | `.agents/skills/global_vault_symlinker/` | Zero-byte cross-platform directory junctions |
 | Asset Crawler & Metadata Scraper | `.agents/skills/asset_crawler_metadata_scraper/` | Background file indexing, hashing, CivitAI/HF metadata |
 | Canvas Gallery Restore | `.agents/skills/canvas_gallery_restore/` | My Creations gallery with drag-and-drop restore |
 | OTA Ghost Updater | `.agents/skills/ota_ghost_updater/` | Self-healing code updates without data loss |
 | **Intelligent Model Router** | `.agents/skills/intelligent_model_router/` | AI model tier selection for development tasks |
+| **QA Guardian Agent** | `.agents/skills/qa_guardian_agent/` | Automated regression testing on save/commit |
 
 ---
 
@@ -308,8 +311,8 @@ AG SM/                              ← Project Root
 │   └── new_feature.md
 │
 ├── .backend/                       ← Python backend (served at runtime)
-│   ├── server.py                   ← HTTP server + API router (1100+ lines)
-│   ├── metadata_db.py              ← SQLite ORM layer (models, generations, embeddings, tags)
+│   ├── server.py                   ← HTTP server + API router (~1700 lines, 44 endpoints)
+│   ├── metadata_db.py              ← SQLite ORM layer (~485 lines, models/generations/embeddings/tags)
 │   ├── vault_crawler.py            ← Background file indexer with ThreadPoolExecutor
 │   ├── civitai_client.py           ← CivitAI API v1 hash-based metadata scraper
 │   ├── hf_client.py                ← HuggingFace Hub search client
@@ -323,7 +326,7 @@ AG SM/                              ← Project Root
 │   ├── bootstrap.py                ← First-run directory structure initialization
 │   │
 │   ├── static/
-│   │   └── index.html              ← Monolithic frontend (216KB, all UI tabs)
+│   │   └── index.html              ← Monolithic frontend (~260KB, all UI tabs + Sprint 9 widgets)
 │   │
 │   ├── recipes/                    ← App Store installation templates
 │   │   ├── comfyui.json
@@ -410,6 +413,9 @@ fetch('/api/models').then(r => r.json()).catch(err => showToast('Error: ' + err)
 // ✅ REQUIRED: Template literals for dynamic HTML (no string concatenation)
 const card = `<div class="model-card" data-hash="${model.file_hash}">`;
 
+// ✅ REQUIRED: Explicit Route Mapping
+// UI values (e.g., 'comfyui') MUST be explicitly mapped to expected backend endpoints (e.g., '/api/comfy_proxy'). Do NOT blindly interpolate `${engine}_proxy` without checking.
+
 // ❌ FORBIDDEN: Global event object access (use event parameter)
 function switchTab(event, tabId) {  // CORRECT
 function switchTab(tabId) { const e = event; }  // WRONG
@@ -420,10 +426,12 @@ function switchTab(tabId) { const e = event; }  // WRONG
 | Rule | Implementation |
 |------|---------------|
 | **Path traversal prevention** | `if ".." in path: send_error(403)` on all static file serving |
+| **API Fallback Routing** | Never use `send_error(404)` on `/api/` endpoints as it returns `<!DOCTYPE HTML>`. Always use `send_json_response({"error": ...}, 404)` to prevent JS `json()` parse errors. |
 | **Symlink target validation** | `os.path.abspath()` both source and target before creating links |
 | **Subprocess injection prevention** | Always use list-form `subprocess.run([...])`, never `shell=True` with user input |
 | **API key protection** | Keys stored in `settings.json` (gitignored), never logged, never in error responses |
 | **SQLite injection prevention** | Always use parameterized queries `cursor.execute('...?...', (param,))` |
+| **HTTP Redirect Authentication** | Always strip `Authorization` headers when processing HTTP redirects (e.g., using `HTTPRedirectHandler`) to prevent AWS S3/Cloudfront `400 Bad Request` exceptions on CDNs. |
 
 ### Preferred Libraries
 

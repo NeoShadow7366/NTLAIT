@@ -13,10 +13,14 @@ def create_release_build(root_dir: str):
 
     # Files and folders to strictly ignore when packaging
     ignore_dirs = {
-        "bin", "packages", "dist", ".git", "__pycache__", "cache", ".gemini"
+        "bin", "packages", "dist", ".git", "__pycache__", "cache", ".gemini",
+        ".venv", ".pytest_cache", ".tests", "node_modules", ".github"
     }
     ignore_files = {
-        "metadata.sqlite", "build.py", "AIManager_Release.zip"
+        "metadata.sqlite", "build.py", "AIManager_Release.zip",
+        ".coverage", "test_results.txt", "merged_walkthroughs.md",
+        "merged_walkthroughs.txt", "pending_work.md", "collect_docs.py",
+        "requirements-qa.txt"
     }
     
     # We will explicitly add Global_Vault subdirectories manually as empty stubs

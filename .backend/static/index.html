@@ -629,6 +629,171 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.6);
         }
 
+        /* ═══ Sprint 9 — Activity Feed ═══ */
+        .activity-feed {
+            margin-top: 30px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 24px; overflow: hidden;
+        }
+        .activity-feed h3 { margin: 0 0 16px; font-size: 1rem; color: var(--text-main); }
+        .activity-item {
+            display: flex; align-items: center; gap: 14px;
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+            cursor: pointer; transition: background 0.15s;
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-item:hover { background: rgba(99,102,241,0.06); border-radius: 8px; margin: 0 -8px; padding: 12px 8px; }
+        .activity-icon { font-size: 1.4rem; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(99,102,241,0.12); border-radius: 10px; flex-shrink: 0; }
+        .activity-text { flex: 1; min-width: 0; }
+        .activity-text .primary { font-size: 0.88rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-text .secondary { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+        .activity-time { font-size: 0.75rem; color: var(--text-muted); flex-shrink: 0; }
+
+        /* ═══ Sprint 9 — Category Donut Chart ═══ */
+        .dash-row { display: flex; gap: 24px; margin-top: 30px; flex-wrap: wrap; }
+        .dash-row > * { flex: 1; min-width: 300px; }
+        .donut-container {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 24px; text-align: center;
+        }
+        .donut-container h3 { margin: 0 0 16px; font-size: 1rem; }
+        .donut-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; margin-top: 16px; }
+        .donut-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted); }
+        .donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ═══ Sprint 9 — Token Counter ═══ */
+        .token-counter {
+            display: flex; justify-content: flex-end; align-items: center; gap: 6px;
+            font-size: 0.78rem; font-weight: 600; margin-top: -16px; margin-bottom: 12px;
+            padding-right: 4px;
+        }
+        .token-counter .count { font-family: monospace; }
+        .token-counter.green .count { color: #10b981; }
+        .token-counter.yellow .count { color: #f59e0b; }
+        .token-counter.red .count { color: #ef4444; }
+
+        /* ═══ Sprint 9 — Batch Queue Panel ═══ */
+        .batch-panel {
+            position: fixed; bottom: 20px; right: 20px; width: 380px; max-height: 420px;
+            background: rgba(15,23,42,0.97); border: 1px solid rgba(99,102,241,0.3);
+            border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            z-index: 90; display: none; flex-direction: column;
+            backdrop-filter: blur(12px); overflow: hidden;
+            animation: slideUp 0.25s ease-out;
+        }
+        .batch-panel.open { display: flex; }
+        .batch-panel-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .batch-panel-header h3 { margin: 0; font-size: 0.95rem; }
+        .batch-list { overflow-y: auto; flex: 1; padding: 10px 16px; }
+        .batch-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.85rem;
+        }
+        .batch-item:last-child { border-bottom: none; }
+        .batch-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .batch-status.pending { background: #64748b; }
+        .batch-status.running { background: #3b82f6; animation: progressPulse 1s infinite; }
+        .batch-status.done { background: #10b981; }
+        .batch-status.failed { background: #ef4444; }
+
+        /* ═══ Sprint 10 — Gallery Star Rating ═══ */
+        .gallery-star-bar {
+            display: flex; gap: 2px; cursor: pointer; margin-top: 4px;
+        }
+        .gallery-star-bar .star {
+            font-size: 1rem; color: #475569; transition: color 0.15s;
+        }
+        .gallery-star-bar .star.filled { color: #fbbf24; }
+        .gallery-star-bar:hover .star { color: #fbbf24; opacity: 0.5; }
+        .gallery-star-bar:hover .star.hover-active { opacity: 1; }
+
+        /* ═══ Sprint 10 — Gallery Tag Filter Toolbar ═══ */
+        .tag-filter-bar {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+        }
+        .tag-pill {
+            background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+            color: #a5b4fc; padding: 5px 14px; border-radius: 20px;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tag-pill:hover, .tag-pill.active {
+            background: rgba(99,102,241,0.35); border-color: #6366f1; color: #e0e7ff;
+        }
+
+        /* ═══ Sprint 10 — A/B Comparison Modal ═══ */
+        .ab-overlay {
+            position: fixed; inset: 0; z-index: 800;
+            background: rgba(0,0,0,0.88); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+        }
+        .ab-overlay.open { display: flex; }
+        .ab-container {
+            width: 90vw; max-width: 1200px; height: 80vh;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 20px; overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+            display: flex; flex-direction: column;
+            animation: cmdSlideIn 0.2s ease-out;
+        }
+        .ab-header {
+            padding: 16px 24px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .ab-header h2 { margin: 0; font-size: 1.1rem; }
+        .ab-body {
+            flex: 1; display: flex; position: relative; overflow: hidden;
+        }
+        .ab-pane {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: #000; position: relative; overflow: hidden;
+        }
+        .ab-pane img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+        .ab-pane-label {
+            position: absolute; top: 12px; left: 12px;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            padding: 5px 14px; border-radius: 8px;
+            font-size: 0.8rem; font-weight: 700; color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .ab-divider {
+            width: 4px; background: var(--primary); cursor: col-resize;
+            flex-shrink: 0; z-index: 2; position: relative;
+            transition: background 0.15s;
+        }
+        .ab-divider:hover, .ab-divider.dragging { background: #818cf8; }
+        .ab-pane-meta {
+            position: absolute; bottom: 12px; left: 12px; right: 12px;
+            background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+            padding: 10px 14px; border-radius: 10px;
+            font-size: 0.78rem; color: #94a3b8;
+            border: 1px solid rgba(255,255,255,0.06);
+            display: none;
+        }
+        .ab-pane:hover .ab-pane-meta { display: block; }
+
+        /* ═══ Sprint 10 — Disk Space Warning ═══ */
+        .disk-warning {
+            background: linear-gradient(90deg, rgba(245,158,11,0.15), rgba(239,68,68,0.12));
+            border: 1px solid #d97706; border-radius: 12px;
+            padding: 16px 20px; margin-top: 20px;
+            display: none; align-items: center; gap: 14px;
+            animation: diskPulse 3s ease-in-out infinite;
+        }
+        @keyframes diskPulse {
+            0%, 100% { border-color: #d97706; }
+            50% { border-color: #f59e0b; }
+        }
+        .disk-warning-icon { font-size: 1.6rem; flex-shrink: 0; }
+        .disk-warning-text { flex: 1; }
+        .disk-warning-text .title { font-weight: 700; color: #fbbf24; font-size: 0.9rem; }
+        .disk-warning-text .detail { color: #d4a43a; font-size: 0.82rem; margin-top: 2px; }
+
     </style>
 </head>
 <body>
@@ -690,6 +855,32 @@
                     <div class="dash-card-icon">⚡</div>
                     <div class="dash-card-value" id="dash-running">—</div>
                     <div class="dash-card-label">Running Engines</div>
+                </div>
+            </div>
+
+            <!-- Sprint 9: Dashboard Intelligence -->
+            <div class="dash-row">
+                <!-- Activity Feed -->
+                <div class="activity-feed">
+                    <h3>📈 Recent Activity</h3>
+                    <div id="dash-activity-list">
+                        <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px;">No recent activity.</div>
+                    </div>
+                </div>
+                <!-- Category Distribution Donut Chart -->
+                <div class="donut-container">
+                    <h3>📊 Model Distribution</h3>
+                    <svg id="dash-donut" viewBox="0 0 200 200" width="180" height="180" style="margin: 0 auto; display: block;"></svg>
+                    <div id="dash-donut-legend" class="donut-legend"></div>
+                </div>
+            </div>
+
+            <!-- Sprint 10: Disk Space Warning -->
+            <div id="dash-disk-warning" class="disk-warning">
+                <div class="disk-warning-icon">⚠️</div>
+                <div class="disk-warning-text">
+                    <div class="title">Vault Storage Running High</div>
+                    <div class="detail" id="dash-disk-detail">Your Global Vault is approaching the configured storage threshold.</div>
                 </div>
             </div>
         </div>
@@ -821,6 +1012,8 @@
                 <button onclick="triggerUpdatesCheck()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Query CivitAI for newer versions">🔄 Check Updates</button>
             <button id="vault-select-toggle" onclick="toggleVaultSelectMode()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Multi-Select for Bulk Operations">☑️ Select</button>
                 <button onclick="triggerUnmanagedImport()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #a7f3d0; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Scan Global_Vault for local files and fetch metadata">📥 Import Local Files</button>
+                <button id="btn-vault-import-backup" onclick="document.getElementById('vault-import-file').click()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Import metadata from a vault export JSON">📤 Import Backup</button>
+                <input type="file" id="vault-import-file" accept=".json" style="display:none" onchange="handleVaultImportBackup(this.files[0])">
             </div>
 
             <div class="grid" id="models-grid" style="--card-width: 250px;"></div>
@@ -846,7 +1039,11 @@
                     <option value="oldest">Oldest First</option>
                     <option value="top_rated">Top Rated</option>
                 </select>
+                <select id="gallery-tag-filter" class="select-fancy" style="width:auto;" onchange="loadGalleryByTag(this.value)">
+                    <option value="">All Tags</option>
+                </select>
             </div>
+            <div id="gallery-tag-bar" class="tag-filter-bar" style="display:none;"></div>
             <div class="grid" id="gallery-grid" style="--card-width: 240px;">
                 <div class="empty-state">No generations yet. Create something in the Inference Studio!</div>
             </div>
@@ -1012,6 +1209,16 @@
                     <h2 style="margin:0; font-size:1.1rem;">Generation Info</h2>
                     <button onclick="document.getElementById('gallery-lightbox').style.display='none'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
                 </div>
+
+                <!-- Sprint 10: Star Rating -->
+                <div class="section-title">Rating</div>
+                <div id="gl-star-bar" class="gallery-star-bar" data-id="0" data-rating="0">
+                    <span class="star" onclick="rateGeneration(1)" onmouseenter="hoverStars(1)" onmouseleave="unhoverStars()">★</span>
+                    <span class="star" onclick="rateGeneration(2)" onmouseenter="hoverStars(2)" onmouseleave="unhoverStars()">★</span>
+                    <span class="star" onclick="rateGeneration(3)" onmouseenter="hoverStars(3)" onmouseleave="unhoverStars()">★</span>
+                    <span class="star" onclick="rateGeneration(4)" onmouseenter="hoverStars(4)" onmouseleave="unhoverStars()">★</span>
+                    <span class="star" onclick="rateGeneration(5)" onmouseenter="hoverStars(5)" onmouseleave="unhoverStars()">★</span>
+                </div>
                 
                 <div class="section-title">Prompt</div>
                 <div id="gl-prompt" style="font-size:0.85rem; color:#f1f5f9; background:var(--bg-color); padding:10px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border); white-space:pre-wrap;"></div>
@@ -1028,6 +1235,11 @@
                     <div><div class="section-title" style="margin-bottom:4px;">Seed</div><div id="gl-seed" style="color:#fff"></div></div>
                 </div>
                 <div id="gl-date" style="margin-top:20px; font-size:0.75rem; color:var(--text-muted); text-align:right;"></div>
+
+                <!-- Sprint 10: A/B Compare Button -->
+                <div style="margin-top:12px; border-top: 1px solid var(--border); padding-top:12px;">
+                    <button id="gl-ab-btn" onclick="startABComparison()" style="width:100%; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border:none; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem; transition:transform 0.15s;" onmouseenter="this.style.transform='scale(1.02)'" onmouseleave="this.style.transform='scale(1)'">🔀 Compare A/B</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1380,7 +1592,8 @@
             <!-- Prompts -->
             <div style="background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column;">
                 <label class="section-title">Prompt</label>
-                <textarea id="inf-prompt" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit; margin-bottom: 20px;" placeholder="masterpiece, best quality, highly detailed..."></textarea>
+                <textarea id="inf-prompt" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit; margin-bottom: 4px;" placeholder="masterpiece, best quality, highly detailed..." oninput="updateTokenCounter()"></textarea>
+                <div class="token-counter green" id="inf-token-counter"><span class="count" id="inf-token-count">0</span><span style="color:var(--text-muted)"> / <span id="inf-token-limit">77</span> tokens</span></div>
                 
                 <div id="inf-sd-neg-row"><label class="section-title">Negative Prompt</label>
                 <textarea id="inf-negative" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit;" placeholder="worst quality, low quality, blurry..."></textarea></div>
@@ -1416,10 +1629,16 @@
         <div id="inf-col-right" style="flex: 1; min-width:200px; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
             <!-- Generate button above canvas -->
             <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink:0;">
-                <button class="btn-download" id="inf-generate-btn" onclick="executeInference()" style="position: relative; overflow: hidden; height: 50px; font-size: 1.1rem; width:100%;">
-                    <div id="inf-progress-fill" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(59, 130, 246, 0.4); transition: width 0.1s linear; pointer-events: none;"></div>
-                    <span id="inf-generate-text" style="position: relative; z-index: 2;">Generate Image</span>
-                </button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-download" id="inf-generate-btn" onclick="executeInference()" style="position: relative; overflow: hidden; height: 50px; font-size: 1.1rem; flex:1;">
+                        <div id="inf-progress-fill" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(59, 130, 246, 0.4); transition: width 0.1s linear; pointer-events: none;"></div>
+                        <span id="inf-generate-text" style="position: relative; z-index: 2;">Generate Image</span>
+                    </button>
+                    <button id="inf-batch-add-btn" onclick="addToBatchQueue()" style="height:50px; width: 50px; flex-shrink:0; background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; border-radius:8px; color:#fff; font-size:1.3rem; cursor:pointer; transition:transform 0.15s;" title="Add to Batch Queue" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">+⏳</button>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+                    <button id="inf-batch-toggle" onclick="toggleBatchPanel()" style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; padding:2px 6px;">Queue (<span id="inf-batch-count">0</span>)</button>
+                </div>
             </div>
             <!-- Canvas output -->
             <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #000; position: relative; overflow:hidden; cursor:crosshair;" id="inf-canvas-container"
@@ -2004,9 +2223,10 @@
 
 
         /* ═══════════════════════════════════════════════
-           MY CREATIONS GALLERY (Feature 2 stub — wired up)
+           MY CREATIONS GALLERY (Sprint 10 Enhanced)
         ═══════════════════════════════════════════════ */
         let _galleryData = [];
+        let _galleryActiveTag = '';
 
         async function loadGallery() {
             const sort = document.getElementById('gallery-sort')?.value || 'newest';
@@ -2016,19 +2236,74 @@
                 const data = await res.json();
                 _galleryData = data.generations || [];
                 renderGallery(_galleryData);
+                loadGalleryTags();
             } catch(e) {
-                // Gallery endpoint not yet available — show placeholder
                 document.getElementById('gallery-grid').innerHTML = '<div class="empty-state">No generations yet. Create something in the Inference Studio!</div>';
             }
         }
 
-             function filterGallery(query) {
+        async function loadGalleryTags() {
+            try {
+                const res = await fetch('/api/gallery/tags');
+                const data = await res.json();
+                const tags = data.tags || [];
+                // Populate dropdown
+                const sel = document.getElementById('gallery-tag-filter');
+                if(sel) {
+                    sel.innerHTML = '<option value="">All Tags</option>' +
+                        tags.map(t => `<option value="${t}">${t}</option>`).join('');
+                }
+                // Populate pill bar
+                const bar = document.getElementById('gallery-tag-bar');
+                if(bar && tags.length > 0) {
+                    bar.style.display = 'flex';
+                    bar.innerHTML = `<span class="tag-pill${_galleryActiveTag===''?' active':''}" onclick="loadGalleryByTag('')">All</span>` +
+                        tags.map(t => `<span class="tag-pill${_galleryActiveTag===t?' active':''}" onclick="loadGalleryByTag('${t}')">${t}</span>`).join('');
+                } else if(bar) {
+                    bar.style.display = 'none';
+                }
+            } catch(e) {
+                // Tags endpoint may not be available yet
+            }
+        }
+
+        async function loadGalleryByTag(tag) {
+            _galleryActiveTag = tag;
+            if(!tag) {
+                loadGallery();
+                return;
+            }
+            try {
+                const res = await fetch(`/api/gallery?tag=${encodeURIComponent(tag)}`);
+                const data = await res.json();
+                _galleryData = data.generations || [];
+                renderGallery(_galleryData);
+                // Update active pill
+                document.querySelectorAll('#gallery-tag-bar .tag-pill').forEach(p => {
+                    p.classList.toggle('active', p.innerText === tag);
+                });
+                const sel = document.getElementById('gallery-tag-filter');
+                if(sel) sel.value = tag;
+            } catch(e) {
+                document.getElementById('gallery-grid').innerHTML = '<div class="empty-state">Failed to filter by tag.</div>';
+            }
+        }
+
+        function filterGallery(query) {
             const q = query.toLowerCase();
             const filtered = _galleryData.filter(g =>
                 (g.prompt || '').toLowerCase().includes(q) ||
                 (g.model || '').toLowerCase().includes(q)
             );
             renderGallery(filtered);
+        }
+
+        function renderStars(rating) {
+            let html = '';
+            for(let i = 1; i <= 5; i++) {
+                html += `<span class="star${i <= rating ? ' filled' : ''}">★</span>`;
+            }
+            return html;
         }
 
         function renderGallery(items) {
@@ -2045,20 +2320,249 @@
                     <div class="card-banner" style="background:var(--surface);">
                         <h3 style="font-size:0.85rem; height:1.2rem; overflow:hidden;">${g.prompt || 'Untitled'}</h3>
                         <div class="card-meta-row">
-                            <span>${g.model}</span>
+                            <span>${g.model || ''}</span>
                             <span>${new Date(g.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div class="gallery-star-bar" style="pointer-events:none;">
+                            ${renderStars(g.rating || 0)}
                         </div>
                     </div>
                 </div>
             `).join('');
         }
 
+        // Sprint 10: Gallery Lightbox with star rating support
+        let _glCurrentItem = null;
+
         function openGalleryItem(id) {
             const g = _galleryData.find(x => x.id === id);
             if(!g) return;
-            // Future: open gallery lightbox with full params + "Send to Studio"
-            alert(`Prompt: ${g.prompt || 'N/A'}\nModel: ${g.model}\nSeed: ${g.seed}`);
+            _glCurrentItem = g;
+
+            document.getElementById('gl-img').src = g.image_path;
+            document.getElementById('gl-prompt').innerText = g.prompt || 'N/A';
+            document.getElementById('gl-negative').innerText = g.negative || 'N/A';
+            document.getElementById('gl-model').innerText = g.model || '—';
+            document.getElementById('gl-sampler').innerText = g.sampler || '—';
+            document.getElementById('gl-steps').innerText = g.steps || '—';
+            document.getElementById('gl-cfg').innerText = g.cfg || '—';
+            document.getElementById('gl-size').innerText = `${g.width || '?'}×${g.height || '?'}`;
+            document.getElementById('gl-seed').innerText = g.seed || '—';
+            document.getElementById('gl-date').innerText = g.created_at ? new Date(g.created_at).toLocaleString() : '';
+
+            // Star rating display
+            const bar = document.getElementById('gl-star-bar');
+            if(bar) {
+                bar.dataset.id = g.id;
+                bar.dataset.rating = g.rating || 0;
+                updateStarDisplay(g.rating || 0);
+            }
+
+            document.getElementById('gallery-lightbox').style.display = 'flex';
         }
+
+        // Sprint 10: Star Rating UI
+        function updateStarDisplay(rating) {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            const stars = bar.querySelectorAll('.star');
+            stars.forEach((s, i) => {
+                s.classList.toggle('filled', i < rating);
+            });
+        }
+
+        function hoverStars(n) {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            const stars = bar.querySelectorAll('.star');
+            stars.forEach((s, i) => {
+                s.classList.toggle('hover-active', i < n);
+            });
+        }
+
+        function unhoverStars() {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            bar.querySelectorAll('.star').forEach(s => s.classList.remove('hover-active'));
+        }
+
+        async function rateGeneration(rating) {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            const id = parseInt(bar.dataset.id);
+            bar.dataset.rating = rating;
+            updateStarDisplay(rating);
+
+            // Update local data
+            const g = _galleryData.find(x => x.id === id);
+            if(g) g.rating = rating;
+
+            // Persist to backend
+            try {
+                await fetch('/api/gallery/rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id, rating })
+                });
+            } catch(e) {
+                console.warn('Failed to persist rating:', e);
+            }
+        }
+
+        async function restoreToStudioFromGallery() {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            const id = parseInt(bar.dataset.id);
+            const g = _galleryData.find(x => x.id === id);
+            if(!g) return;
+            
+            // Rehydrate studio
+            if(g.prompt) {
+                const promptEl = document.getElementById('inf-prompt');
+                if(promptEl) promptEl.value = g.prompt;
+            }
+            if(g.negative_prompt) {
+                const negEl = document.getElementById('inf-negative');
+                if(negEl) negEl.value = g.negative_prompt;
+            }
+            if(g.model_name) {
+                const modEl = document.getElementById('inf-model');
+                if(modEl) modEl.value = g.model_name;
+            }
+            if(g.loras) {
+                const lorasEl = document.getElementById('inf-loras');
+                if(lorasEl) lorasEl.value = g.loras;
+            }
+            
+            try {
+                const params = JSON.parse(g.parameters || '{}');
+                if(params.width) document.getElementById('inf-width').value = params.width;
+                if(params.height) document.getElementById('inf-height').value = params.height;
+                if(params.steps) document.getElementById('inf-steps').value = params.steps;
+                if(params.cfg) document.getElementById('inf-cfg').value = params.cfg;
+                if(params.sampler_name) document.getElementById('inf-sampler').value = params.sampler_name;
+                if(params.seed !== undefined) document.getElementById('inf-seed').value = params.seed;
+            } catch(e) {}
+            
+            document.getElementById('gallery-lightbox').style.display = 'none';
+            switchTab('inference', document.querySelector('.nav-item[onclick*="inference"]'));
+            showSettingsToast('⚡ Sent to Studio!');
+        }
+
+        async function deleteGenerationFromGallery() {
+            const bar = document.getElementById('gl-star-bar');
+            if(!bar) return;
+            const id = parseInt(bar.dataset.id);
+            if(!confirm("Are you sure you want to delete this generation?")) return;
+            
+            try {
+                const res = await fetch('/api/gallery/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ids: [id] })
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    document.getElementById('gallery-lightbox').style.display = 'none';
+                    _galleryData = _galleryData.filter(x => x.id !== id);
+                    renderGalleryGrid(_galleryData);
+                    showSettingsToast('🗑 Generation deleted');
+                } else alert(data.message);
+            } catch(e) {
+                alert('Delete failed: ' + e.message);
+            }
+        }
+
+        /* ═══════════════════════════════════════════════
+           SPRINT 10 — A/B Comparison
+        ═══════════════════════════════════════════════ */
+        let _abSlotA = null, _abSlotB = null;
+        let _abSelectMode = null; // 'a' or 'b'
+
+        function startABComparison() {
+            if(!_glCurrentItem) return;
+            // Load current item into slot A
+            _abSlotA = { ..._glCurrentItem };
+            _abSlotB = null;
+            _abSelectMode = 'b'; // Next gallery click goes to B
+
+            // Close gallery lightbox, open A/B
+            document.getElementById('gallery-lightbox').style.display = 'none';
+            const overlay = document.getElementById('ab-comparison');
+            overlay.classList.add('open');
+
+            // Render pane A
+            renderABPane('a', _abSlotA);
+            // Clear pane B
+            document.getElementById('ab-img-b').style.display = 'none';
+            document.getElementById('ab-empty-b').style.display = 'block';
+            document.getElementById('ab-empty-b').innerText = 'Click any gallery card to set Image B';
+            document.getElementById('ab-meta-b').innerHTML = '';
+
+            showSettingsToast('Click a gallery card to select Image B');
+        }
+
+        function renderABPane(side, item) {
+            const img = document.getElementById('ab-img-' + side);
+            const empty = document.getElementById('ab-empty-' + side);
+            const meta = document.getElementById('ab-meta-' + side);
+            if(!item) return;
+            img.src = item.image_path;
+            img.style.display = 'block';
+            empty.style.display = 'none';
+            meta.innerHTML = `<b>Model:</b> ${item.model || '—'} · <b>Steps:</b> ${item.steps || '—'} · <b>CFG:</b> ${item.cfg || '—'} · <b>Seed:</b> ${item.seed || '—'}<br><b>Prompt:</b> ${(item.prompt || '').substring(0, 120)}${(item.prompt || '').length > 120 ? '...' : ''}`;
+        }
+
+        function closeABComparison() {
+            document.getElementById('ab-comparison').classList.remove('open');
+            _abSelectMode = null;
+        }
+
+        function swapABPanes() {
+            const tmp = _abSlotA;
+            _abSlotA = _abSlotB;
+            _abSlotB = tmp;
+            if(_abSlotA) renderABPane('a', _abSlotA);
+            else {
+                document.getElementById('ab-img-a').style.display = 'none';
+                document.getElementById('ab-empty-a').style.display = 'block';
+            }
+            if(_abSlotB) renderABPane('b', _abSlotB);
+            else {
+                document.getElementById('ab-img-b').style.display = 'none';
+                document.getElementById('ab-empty-b').style.display = 'block';
+            }
+        }
+
+        // A/B divider drag
+        document.addEventListener('DOMContentLoaded', () => {
+            const divider = document.getElementById('ab-divider');
+            if(!divider) return;
+            divider.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                divider.classList.add('dragging');
+                const body = document.querySelector('.ab-body');
+                const paneA = document.getElementById('ab-pane-a');
+                const paneB = document.getElementById('ab-pane-b');
+                const startX = e.clientX;
+                const startWidthA = paneA.offsetWidth;
+                const totalWidth = body.offsetWidth - 4; // minus divider
+                function onMove(ev) {
+                    const dx = ev.clientX - startX;
+                    const newA = Math.max(100, Math.min(totalWidth - 100, startWidthA + dx));
+                    paneA.style.flex = 'none';
+                    paneA.style.width = newA + 'px';
+                    paneB.style.flex = '1';
+                }
+                function onUp() {
+                    divider.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
 
         /* --- CivitAI Explorer Integration --- */
         let installedHashes = new Set(); // To cross-check installed models
@@ -2135,7 +2639,9 @@
             } else {
                 url = new URL('https://civitai.com/api/v1/models');
                 url.searchParams.append('limit', '40');
-                url.searchParams.append('sort', sort);
+                let apiSort = sort;
+                if (sort === 'Size High' || sort === 'Size Low') apiSort = 'Highest Rated';
+                url.searchParams.append('sort', apiSort);
                 url.searchParams.append('nsfw', nsfw);
                 if(early === 'true') url.searchParams.append('earlyAccess', 'true');
                 if(q) url.searchParams.append('query', q);
@@ -2677,28 +3183,29 @@
                 const tagsList = ((item.tags && item.tags.map(t=>t.name)) || []).join(',');
                 
                 let clickStr = '';
-                if(item.metadata && item.metadata.modelId) {
-                    // Ensure metadata has images/files arrays even if empty
-                    if(!item.metadata.images) item.metadata.images = [];
-                    if(!item.metadata.files) item.metadata.files = [];
-                    
-                    // If metadata has no images but we have a local thumbnail, inject it
-                    if(item.metadata.images.length === 0 && item.thumbnail_path) {
-                        item.metadata.images = [{ url: '/' + item.thumbnail_path.replace(/\\/g, '/'), type: 'image', meta: {} }];
-                    }
-                    
-                    const fakeParent = {
-                        id: item.metadata.modelId,
-                        name: item.metadata.model ? item.metadata.model.name : item.filename,
-                        type: item.metadata.model ? item.metadata.model.type : "Unknown",
-                        creator: { username: "Local Vault" },
-                        tags: item.tags || [],
-                        modelVersions: [ item.metadata ]
-                    };
-                    activeModels[fakeParent.id] = fakeParent;
-                    window.cardState[fakeParent.id] = 0;
-                    clickStr = `onclick="openLightbox(${fakeParent.id}, '${item.filename}', '${item.vault_category}')" style="cursor:pointer;"`;
+                if(!item.metadata) item.metadata = {};
+                if(!item.metadata.modelId) item.metadata.modelId = 'local_' + Math.floor(Math.random() * 1000000);
+                
+                // Ensure metadata has images/files arrays even if empty
+                if(!item.metadata.images) item.metadata.images = [];
+                if(!item.metadata.files) item.metadata.files = [];
+                
+                // If metadata has no images but we have a local thumbnail, inject it
+                if(item.metadata.images.length === 0 && item.thumbnail_path) {
+                    item.metadata.images = [{ url: '/' + item.thumbnail_path.replace(/\\/g, '/'), type: 'image', meta: {} }];
                 }
+                
+                const fakeParent = {
+                    id: item.metadata.modelId,
+                    name: item.metadata.model ? item.metadata.model.name : item.filename,
+                    type: item.metadata.model ? item.metadata.model.type : "Unknown",
+                    creator: { username: "Local Vault" },
+                    tags: item.tags || [],
+                    modelVersions: [ item.metadata ]
+                };
+                activeModels[fakeParent.id] = fakeParent;
+                window.cardState[fakeParent.id] = 0;
+                clickStr = `onclick="openLightbox('${fakeParent.id}', '${item.filename}', '${item.vault_category}')" style="cursor:pointer;"`;
                 
                 grid.innerHTML += `
                     <div class="card" data-category="${item.vault_category}" data-tags="${tagsList}" data-name="${displayName.toLowerCase()}" data-filename="${item.filename}" ${clickStr}>
@@ -2735,6 +3242,8 @@
                 const grid = document.getElementById('packages-grid');
                 grid.innerHTML = '';
                 
+                window.activePackages = data.packages || [];
+                
                 if(!data.packages || data.packages.length === 0) {
                     grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">No packages installed yet. Visit the App Store!</div>';
                     return;
@@ -2755,11 +3264,14 @@
                                 ${runBtns}
                                 <button onclick="openLogTerminal('${p.id}', '${p.name}')" style="background: var(--surface-hover); color: white; border: 1px solid var(--border); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">⌨️ Terminal</button>
                                 <button onclick="openExtensions('${p.id}', '${p.name}')" style="background: #8b5cf6; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Plugins</button>
-                                <button onclick="uninstallPackage('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Uninstall</button>
+                                <button onclick="uninstallPackage('${p.id}')" ${p.is_running ? 'disabled' : ''} style="background: ${p.is_running ? '#9ca3af' : '#ef4444'}; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: ${p.is_running ? 'not-allowed' : 'pointer'}; font-weight: 600;" title="${p.is_running ? 'Cannot uninstall while running.' : 'Uninstall'}">Uninstall</button>
                             </div>
                         </div>
                     `;
                 });
+                
+                // Refresh recipes UI to accurately reflect newly installed/uninstalled packages
+                loadRecipes();
             } catch (e) {
                 console.error(e);
             }
@@ -2776,14 +3288,24 @@
                     grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">No recipes found in .backend/recipes/</div>';
                     return;
                 }
+                window.activePackages = window.activePackages || [];
 
                 data.recipes.forEach(r => {
+                    const isInstalled = window.activePackages.some(p => p.id === r.id);
+                    const btnHtml = isInstalled 
+                        ? `<button disabled style="background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); padding: 8px 15px; border-radius: 6px; cursor: not-allowed; font-weight: 600;">✅ Installed</button>`
+                        : `<button onclick="installRecipe('${r.id}')" style="background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Install Sandbox</button>`;
+
                     grid.innerHTML += `
                         <div class="std-card">
-                            <h3 class="card-title">${r.name}</h3>
+                            <h3 class="card-title" style="display:flex; align-items:center; gap:10px;">
+                                ${r.name}
+                                ${isInstalled ? `<span style="font-size:0.7rem; background: #10b981; color:white; padding:2px 6px; border-radius:8px; font-weight: bold;">INSTALLED</span>` : ''}
+                            </h3>
                             <p class="subtitle" style="font-size: 0.85rem; margin-bottom: 15px;">Automated strict environment setup mapping to Global Vault.</p>
-                            <div>
-                                <button onclick="installRecipe('${r.id}')" style="background: #10b981; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Install Sandbox</button>
+                            <div style="display:flex; gap:10px;">
+                                ${btnHtml}
+                                <button onclick="openLogTerminal('${r.id}', '${r.name}')" style="background: var(--surface-hover); color: white; border: 1px solid var(--border); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">⌨️ View Log</button>
                             </div>
                         </div>
                     `;
@@ -3541,9 +4063,33 @@
                             clearInterval(poll);
                             btn.innerText = "Engine Active";
                             btn.style.color = "#4ade80";
+                            btn.onclick = launchActiveEngine;
                             window.engineLaunching = false;
                             initInferenceUI();
+                            return;
                         }
+
+                        const data = await res.json().catch(()=>({}));
+                        if(data.error === "engine_crashed" && data.repair_available) {
+                            clearInterval(poll);
+                            btn.innerHTML = `Repair 🛠️ <span style="font-size:0.6rem">(${data.missing_module || 'Error'})</span>`;
+                            btn.style.color = "#ef4444";
+                            btn.onclick = async () => {
+                                btn.innerText = "Repairing...";
+                                btn.style.color = "#fbbf24";
+                                btn.onclick = launchActiveEngine;
+                                await fetch('/api/repair_dependency', {
+                                    method: 'POST', 
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({package_id: appId})
+                                });
+                                setTimeout(() => { window.engineLaunching = false; launchActiveEngine(); }, 3000);
+                            };
+                            window.engineLaunching = false;
+                            return;
+                        }
+                        
+                        throw new Error("Not ready");
                     } catch(e) {
                         retries++;
                         // BUG-7 fix: Show retry progress and increase timeout to 60s
@@ -3564,7 +4110,7 @@
 
         async function executeInference() {
             const engine = document.getElementById('inf-engine').value;
-            let endpoint = `/api/${engine}_proxy`;
+            let endpoint = engine === 'comfyui' ? '/api/comfy_proxy' : `/api/${engine}_proxy`;
             
             const btn = document.getElementById('inf-generate-btn');
             const txt = document.getElementById('inf-generate-text');
@@ -3647,6 +4193,45 @@
             document.getElementById('inf-canvas-empty').style.display = 'block';
             document.getElementById('inf-canvas-empty').innerText = "Waking Engine...";
 
+            let a1111ProgressInterval = null;
+            let genStartTime = Date.now();
+
+            if (engine === 'a1111' || engine === 'forge') {
+                fill.style.width = '5%';
+                fill.classList.add('progress-pulsing');
+                txt.innerText = "Processing...";
+                document.getElementById('inf-canvas-empty').innerText = "Generating your image...";
+                a1111ProgressInterval = setInterval(async () => {
+                    try {
+                        const progRes = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({endpoint: '/sdapi/v1/progress?skip_current_image=false'})
+                        });
+                        const progData = await progRes.json();
+                        if (progData && typeof progData.progress === 'number') {
+                            fill.style.width = Math.max(5, progData.progress * 100) + '%';
+                            txt.innerText = `Processing... (${Math.floor(progData.eta_relative || 0)}s)`;
+                            if (progData.current_image) {
+                                const canvasImg = document.getElementById('inf-canvas-img');
+                                canvasImg.src = "data:image/png;base64," + progData.current_image;
+                                canvasImg.style.display = 'block';
+                                document.getElementById('inf-canvas-empty').style.display = 'none';
+                            }
+                        }
+                    } catch(e) {}
+                }, 1000);
+            } else if (engine === 'fooocus') {
+                fill.style.width = '5%';
+                fill.classList.add('progress-pulsing');
+                txt.innerText = "Processing...";
+                document.getElementById('inf-canvas-empty').innerText = "Generating your image...";
+                a1111ProgressInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - genStartTime) / 1000);
+                    txt.innerText = `Processing... (${elapsed}s)`;
+                }, 1000);
+            }
+
             try {                
                 const res = await fetch(endpoint, {
                     method: 'POST',
@@ -3654,6 +4239,9 @@
                     body: JSON.stringify({endpoint: '/api/generate', payload: payload})
                 });
                 const data = await res.json();
+                
+                if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
+                
                 if(data.error) throw new Error(data.error);
 
                 if(engine === 'comfyui') {
@@ -3662,18 +4250,49 @@
                     if(window.comfyPollInterval) clearInterval(window.comfyPollInterval);
                     if(window.comfyProgressInterval) clearInterval(window.comfyProgressInterval);
                     
-                    const genStartTime = Date.now();
                     fill.style.width = '5%';
                     fill.classList.add('progress-pulsing');
                     txt.innerText = "Processing...";
                     document.getElementById('inf-canvas-empty').innerText = "Generating your image...";
                     
+                    if(!window.comfyWS) {
+                        try {
+                            window.comfyWS = new WebSocket('ws://127.0.0.1:8188/ws');
+                            window.comfyWS.onmessage = (event) => {
+                                if(typeof event.data === 'string') {
+                                    const msg = JSON.parse(event.data);
+                                    if(msg.type === 'progress') {
+                                        const pfill = document.getElementById('inf-progress-fill');
+                                        if(pfill && msg.data.max > 0) {
+                                            pfill.style.width = ((msg.data.value / msg.data.max) * 100) + '%';
+                                            pfill.classList.remove('progress-pulsing');
+                                        }
+                                    }
+                                } else {
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                        const buffer = new Uint8Array(reader.result);
+                                        if(buffer.length > 8) {
+                                            const imgBlob = new Blob([buffer.slice(8)]);
+                                            const imgUrl = URL.createObjectURL(imgBlob);
+                                            const cimg = document.getElementById('inf-canvas-img');
+                                            if(cimg) {
+                                                cimg.src = imgUrl;
+                                                cimg.style.display = 'block';
+                                                document.getElementById('inf-canvas-empty').style.display = 'none';
+                                            }
+                                        }
+                                    };
+                                    reader.readAsArrayBuffer(event.data);
+                                }
+                            };
+                        } catch(e) {}
+                    }
+                    
                     window.comfyProgressInterval = setInterval(() => {
                         const elapsed = Math.floor((Date.now() - genStartTime) / 1000);
-                        const currentWidth = parseFloat(fill.style.width) || 5;
-                        if(currentWidth < 90) fill.style.width = Math.min(currentWidth + 1.5, 90) + '%';
                         txt.innerText = `Processing... (${elapsed}s)`;
-                    }, 1200);
+                    }, 1000);
                     
                     window.comfyPollInterval = setInterval(async () => {
                         try {
@@ -3725,6 +4344,7 @@
                     btn.disabled = false;
                     txt.innerText = "Generate Image";
                     fill.style.width = '0%';
+                    fill.classList.remove('progress-pulsing');
                 } else if(engine === 'fooocus') {
                     if(data.image) {
                         const canvasImg = document.getElementById('inf-canvas-img');
@@ -3736,8 +4356,10 @@
                     btn.disabled = false;
                     txt.innerText = "Generate Image";
                     fill.style.width = '0%';
+                    fill.classList.remove('progress-pulsing');
                 }
             } catch(e) {
+                if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
                 alert("Generation Failed: " + e.message + `\n\nIs ${engine} running?`);
                 btn.disabled = false;
                 txt.innerText = "Generate Image";
@@ -3833,6 +4455,28 @@
             if(el('dash-packages')) el('dash-packages').innerText = data.installed_packages ?? '—';
             if(el('dash-prompts')) el('dash-prompts').innerText = data.prompts_saved ?? '—';
             if(el('dash-running')) el('dash-running').innerText = data.running_packages ?? '—';
+
+            // Sprint 9: Activity Feed
+            if(data.recent_generations || data.recent_downloads) {
+                renderActivityFeed(data.recent_generations || [], data.recent_downloads || []);
+            }
+            // Sprint 9: Donut Chart
+            if(data.category_distribution) {
+                renderDonutChart(data.category_distribution);
+            }
+
+            // Sprint 10: Disk Space Warning
+            const diskWarn = document.getElementById('dash-disk-warning');
+            if(diskWarn && data.vault_size_bytes && data.vault_size_warning_gb) {
+                const vaultGB = data.vault_size_bytes / (1024 * 1024 * 1024);
+                if(vaultGB >= data.vault_size_warning_gb) {
+                    const detail = document.getElementById('dash-disk-detail');
+                    detail.innerText = `Vault is using ${vaultGB.toFixed(1)} GB (threshold: ${data.vault_size_warning_gb} GB). Consider removing unused models.`;
+                    diskWarn.style.display = 'flex';
+                } else {
+                    diskWarn.style.display = 'none';
+                }
+            }
         }
 
         async function refreshDashboard() {
@@ -3844,6 +4488,276 @@
         }
         setInterval(checkSystemStatus, 3000);
         setInterval(pollDownloads, 1000); // 1-second background poll
+
+        /* ═════════════════════════════════════════════
+           SPRINT 9 — Dashboard Intelligence
+        ═════════════════════════════════════════════ */
+
+        function timeAgo(dateStr) {
+            if(!dateStr) return '';
+            const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+            if(diff < 60) return 'just now';
+            if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+            if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+            return Math.floor(diff/86400) + 'd ago';
+        }
+
+        function renderActivityFeed(generations, downloads) {
+            const container = document.getElementById('dash-activity-list');
+            if(!container) return;
+
+            let items = [];
+            for(const g of generations) {
+                items.push({
+                    icon: '🎨', type: 'generation',
+                    primary: (g.prompt || 'No prompt').substring(0, 60) + (g.prompt && g.prompt.length > 60 ? '...' : ''),
+                    secondary: g.model || 'Unknown model',
+                    time: timeAgo(g.created_at),
+                    sortKey: new Date(g.created_at || 0).getTime()
+                });
+            }
+            for(const d of downloads) {
+                items.push({
+                    icon: '📥', type: 'download',
+                    primary: d.model_name || d.filename || 'Download',
+                    secondary: 'Completed',
+                    time: timeAgo(d.completed_at),
+                    sortKey: new Date(d.completed_at || 0).getTime()
+                });
+            }
+
+            items.sort((a, b) => b.sortKey - a.sortKey);
+            items = items.slice(0, 8);
+
+            if(items.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px;">No recent activity.</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(it => `
+                <div class="activity-item" onclick="switchTab('${it.type === 'generation' ? 'creations' : 'vault'}')">
+                    <div class="activity-icon">${it.icon}</div>
+                    <div class="activity-text">
+                        <div class="primary">${it.primary}</div>
+                        <div class="secondary">${it.secondary}</div>
+                    </div>
+                    <div class="activity-time">${it.time}</div>
+                </div>
+            `).join('');
+        }
+
+        const DONUT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6','#06b6d4','#f43f5e','#84cc16','#a855f7'];
+
+        function renderDonutChart(distribution) {
+            const svg = document.getElementById('dash-donut');
+            const legend = document.getElementById('dash-donut-legend');
+            if(!svg || !legend) return;
+
+            const entries = Object.entries(distribution).filter(([k,v]) => v > 0);
+            const total = entries.reduce((s, [,v]) => s + v, 0);
+            if(total === 0) {
+                svg.innerHTML = '<text x="100" y="105" text-anchor="middle" fill="#64748b" font-size="14">No models</text>';
+                legend.innerHTML = '';
+                return;
+            }
+
+            const cx = 100, cy = 100, r = 75, inner = 45;
+            let startAngle = -Math.PI / 2;
+            let paths = '';
+
+            entries.forEach(([cat, count], i) => {
+                const fraction = count / total;
+                const endAngle = startAngle + fraction * 2 * Math.PI;
+                const largeArc = fraction > 0.5 ? 1 : 0;
+
+                const x1 = cx + r * Math.cos(startAngle);
+                const y1 = cy + r * Math.sin(startAngle);
+                const x2 = cx + r * Math.cos(endAngle);
+                const y2 = cy + r * Math.sin(endAngle);
+                const ix1 = cx + inner * Math.cos(endAngle);
+                const iy1 = cy + inner * Math.sin(endAngle);
+                const ix2 = cx + inner * Math.cos(startAngle);
+                const iy2 = cy + inner * Math.sin(startAngle);
+
+                const color = DONUT_COLORS[i % DONUT_COLORS.length];
+                paths += `<path d="M${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} L${ix1},${iy1} A${inner},${inner} 0 ${largeArc} 0 ${ix2},${iy2} Z" fill="${color}" opacity="0.85"><title>${cat}: ${count} (${(fraction*100).toFixed(1)}%)</title></path>`;
+                startAngle = endAngle;
+            });
+
+            // Center text
+            paths += `<text x="${cx}" y="${cy-4}" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700">${total}</text>`;
+            paths += `<text x="${cx}" y="${cy+14}" text-anchor="middle" fill="#94a3b8" font-size="10">models</text>`;
+            svg.innerHTML = paths;
+
+            legend.innerHTML = entries.map(([cat, count], i) => {
+                const color = DONUT_COLORS[i % DONUT_COLORS.length];
+                return `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${color}"></div>${cat} (${count})</div>`;
+            }).join('');
+        }
+
+        /* ═════════════════════════════════════════════
+           SPRINT 9 — Token Counter
+        ═════════════════════════════════════════════ */
+
+        function getTokenLimit() {
+            const modelType = document.getElementById('inf-model-type');
+            if(!modelType) return 77;
+            const val = modelType.value;
+            if(val === 'flux-dev' || val === 'flux-schnell') return 512;
+            if(val === 'sdxl') return 154; // 77 * 2 (dual encoder)
+            return 77; // SD 1.5 default
+        }
+
+        function countTokens(text) {
+            if(!text || !text.trim()) return 0;
+            // CLIP-style approximation: split on whitespace and commas, each segment is ~1 token
+            return text.split(/[\s,]+/).filter(t => t.length > 0).length;
+        }
+
+        function updateTokenCounter() {
+            const prompt = document.getElementById('inf-prompt');
+            const countEl = document.getElementById('inf-token-count');
+            const limitEl = document.getElementById('inf-token-limit');
+            const container = document.getElementById('inf-token-counter');
+            if(!prompt || !countEl || !container) return;
+
+            const count = countTokens(prompt.value);
+            const limit = getTokenLimit();
+            countEl.innerText = count;
+            if(limitEl) limitEl.innerText = limit;
+
+            const ratio = count / limit;
+            container.className = 'token-counter ' + (ratio > 0.75 ? 'red' : ratio > 0.5 ? 'yellow' : 'green');
+        }
+
+        /* ═════════════════════════════════════════════
+           SPRINT 9 — Batch Generation Queue
+        ═════════════════════════════════════════════ */
+
+        let _batchPollInterval = null;
+
+        function getInferencePayload() {
+            // Gather current inference parameters into a payload object
+            const payload = {
+                prompt: document.getElementById('inf-prompt')?.value || '',
+                negative: document.getElementById('inf-negative')?.value || '',
+                steps: parseInt(document.getElementById('inf-steps')?.value || '20'),
+                cfg: parseFloat(document.getElementById('inf-cfg')?.value || '7'),
+                width: parseInt(document.getElementById('inf-width')?.value || '512'),
+                height: parseInt(document.getElementById('inf-height')?.value || '512'),
+                seed: parseInt(document.getElementById('inf-seed')?.value || '-1'),
+                sampler: document.getElementById('inf-sampler')?.value || 'euler',
+                scheduler: document.getElementById('inf-scheduler')?.value || 'normal',
+                backend: 'comfyui'
+            };
+            // Model
+            const modelSel = document.getElementById('inf-model');
+            if(modelSel) payload.model = modelSel.value;
+            return payload;
+        }
+
+        async function addToBatchQueue() {
+            const payload = getInferencePayload();
+            if(!payload.prompt.trim()) {
+                showToast('Enter a prompt before adding to queue.'); return;
+            }
+            try {
+                const res = await fetch('/api/generate/batch', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ payload })
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    showToast(`Added to queue (${data.queue_length} total)`);
+                    refreshBatchPanel();
+                    if(!_batchPollInterval) {
+                        _batchPollInterval = setInterval(refreshBatchPanel, 2000);
+                    }
+                } else {
+                    showToast('Queue error: ' + (data.message || 'Unknown'));
+                }
+            } catch(e) {
+                showToast('Failed to add to queue: ' + e.message);
+            }
+        }
+
+        async function refreshBatchPanel() {
+            try {
+                const res = await fetch('/api/generate/queue');
+                const data = await res.json();
+                const queue = data.queue || [];
+
+                const countEl = document.getElementById('inf-batch-count');
+                if(countEl) countEl.innerText = queue.length;
+
+                const listEl = document.getElementById('batch-list');
+                if(!listEl) return;
+
+                if(queue.length === 0) {
+                    listEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:20px; font-size:0.85rem;">Queue is empty</div>';
+                    if(_batchPollInterval) { clearInterval(_batchPollInterval); _batchPollInterval = null; }
+                    return;
+                }
+
+                listEl.innerHTML = queue.map(j => `
+                    <div class="batch-item">
+                        <div class="batch-status ${j.status}"></div>
+                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#e2e8f0;">${j.prompt || '(no prompt)'}</div>
+                        <span style="color:var(--text-muted); font-size:0.75rem; flex-shrink:0;">${j.status}</span>
+                    </div>
+                `).join('');
+
+                // Stop polling if all done/failed
+                const allFinished = queue.every(j => j.status === 'done' || j.status === 'failed');
+                if(allFinished && _batchPollInterval) {
+                    clearInterval(_batchPollInterval); _batchPollInterval = null;
+                }
+            } catch(e) {}
+        }
+
+        function toggleBatchPanel() {
+            const panel = document.getElementById('batch-panel');
+            if(!panel) return;
+            panel.classList.toggle('open');
+            if(panel.classList.contains('open')) refreshBatchPanel();
+        }
+
+        /* ═════════════════════════════════════════════
+           SPRINT 9 — Vault Import from Backup
+        ═════════════════════════════════════════════ */
+
+        async function handleVaultImportBackup(file) {
+            if(!file) return;
+            try {
+                const text = await file.text();
+                let parsed = JSON.parse(text);
+                // Support both direct array manifests and {manifest: [...]} wrappers
+                let manifest = Array.isArray(parsed) ? parsed : (parsed.manifest || []);
+
+                if(!manifest.length) {
+                    showToast('Invalid manifest: no model entries found.');
+                    return;
+                }
+
+                const res = await fetch('/api/vault/import', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ manifest })
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    showToast(`Import complete: ${data.imported} imported, ${data.skipped} skipped.`);
+                    loadModels();  // Refresh vault grid
+                } else {
+                    showToast('Import failed: ' + (data.message || 'Unknown error'));
+                }
+            } catch(e) {
+                showToast('Import error: ' + e.message);
+            }
+            // Reset file input
+            document.getElementById('vault-import-file').value = '';
+        }
         
         /* ═══════════════════════════════════════════════
            SETTINGS PANEL — Load / Save / OTA
@@ -4131,6 +5045,19 @@
             { icon: '🔄', label: 'Check for Model Updates', action: () => { triggerUpdatesCheck(); }, shortcut: '' },
             { icon: '🩺', label: 'Run Vault Health Check', action: () => { triggerHealthCheck(); }, shortcut: '' },
             { icon: '📚', label: 'Open Prompt Library', action: () => { switchTab('inference'); setTimeout(togglePromptLibrary, 300); }, shortcut: '' },
+            // Sprint 10: New commands
+            { icon: '🔎', label: 'Search Models in Vault', action: () => { switchTab('vault'); setTimeout(() => document.getElementById('vault-search')?.focus(), 300); }, shortcut: '' },
+            { icon: '🖼️', label: 'View Recent Generations', action: () => { switchTab('creations'); }, shortcut: '' },
+            { icon: '🎨', label: 'Toggle Theme (Dark/Light/Glass)', action: () => {
+                const themes = ['dark', 'light', 'glass'];
+                const current = document.body.getAttribute('data-theme') || 'dark';
+                const next = themes[(themes.indexOf(current) + 1) % themes.length];
+                document.body.setAttribute('data-theme', next);
+                const themeEl = document.getElementById('set-theme');
+                if(themeEl) themeEl.value = next;
+                showSettingsToast(`Theme switched to ${next}`);
+            }, shortcut: '' },
+            { icon: '🔀', label: 'A/B Compare Generations', action: () => { switchTab('creations'); showSettingsToast('Open a generation, then click Compare A/B'); }, shortcut: '' },
         ];
         let _cmdActiveIndex = 0;
         let _cmdFiltered = [..._commandRegistry];
@@ -4466,6 +5393,45 @@
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                 <button onclick="document.getElementById('export-dialog').style.display='none'" style="background:var(--surface-hover); border:none; color:var(--text-muted); padding:10px 20px; border-radius:8px; cursor:pointer;">Cancel</button>
                 <button onclick="executeVaultExportConfirm()" style="background:var(--primary); color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sprint 9: Batch Queue Panel -->
+    <div id="batch-panel" class="batch-panel">
+        <div class="batch-panel-header">
+            <h3>⏳ Batch Queue</h3>
+            <button onclick="toggleBatchPanel()" style="background:none; border:none; color:var(--text-muted); font-size:1.3rem; cursor:pointer;">×</button>
+        </div>
+        <div class="batch-list" id="batch-list">
+            <div style="color:var(--text-muted); text-align:center; padding:20px; font-size:0.85rem;">Queue is empty</div>
+        </div>
+    </div>
+
+    <!-- Sprint 10: A/B Comparison Modal -->
+    <div id="ab-comparison" class="ab-overlay" onclick="if(event.target===this) closeABComparison()">
+        <div class="ab-container">
+            <div class="ab-header">
+                <h2>🔀 A/B Comparison</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button id="ab-swap-btn" onclick="swapABPanes()" style="background:var(--surface-hover); border:1px solid var(--border); color:#e2e8f0; padding:6px 16px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;">⇄ Swap</button>
+                    <button onclick="closeABComparison()" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">&times;</button>
+                </div>
+            </div>
+            <div class="ab-body">
+                <div class="ab-pane" id="ab-pane-a">
+                    <div class="ab-pane-label">A</div>
+                    <img id="ab-img-a" src="" style="display:none;">
+                    <div id="ab-empty-a" style="color:var(--text-muted); font-size:0.95rem;">Select Image A from gallery</div>
+                    <div class="ab-pane-meta" id="ab-meta-a"></div>
+                </div>
+                <div class="ab-divider" id="ab-divider"></div>
+                <div class="ab-pane" id="ab-pane-b">
+                    <div class="ab-pane-label">B</div>
+                    <img id="ab-img-b" src="" style="display:none;">
+                    <div id="ab-empty-b" style="color:var(--text-muted); font-size:0.95rem;">Select Image B from gallery</div>
+                    <div class="ab-pane-meta" id="ab-meta-b"></div>
+                </div>
             </div>
         </div>
     </div>

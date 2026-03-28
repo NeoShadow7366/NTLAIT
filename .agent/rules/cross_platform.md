@@ -93,3 +93,20 @@ ARCH=$(uname -m)  # x86_64, aarch64, arm64
 import platform
 arch = platform.machine()  # AMD64, x86_64, arm64, aarch64
 ```
+
+## 9. Recursive Directory Deletion (shutil.rmtree)
+
+```python
+# Windows throws PermissionError when deleting read-only files (e.g., inside .git folders)
+import shutil, os, stat
+
+def remove_readonly(func, path, _):
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+shutil.rmtree(target_dir, onerror=remove_readonly)
+```
+

@@ -43,7 +43,11 @@ def create_safe_directory_link(source_dir: str, target_link: str) -> bool:
             cmd = ["cmd.exe", "/c", "mklink", "/J", target_link, source_dir]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                raise OSError(f"Junction creation failed: {result.stderr.strip()}")
+                # Fallback to mklink /D if junction fails (e.g., non-NTFS volumes)
+                cmd_d = ["cmd.exe", "/c", "mklink", "/D", target_link, source_dir]
+                result_d = subprocess.run(cmd_d, capture_output=True, text=True)
+                if result_d.returncode != 0:
+                    raise OSError(f"Junction AND Symlink creation failed. J-err: {result.stderr.strip()}, D-err: {result_d.stderr.strip()}")
         else:
             os.symlink(source_dir, target_link, target_is_directory=True)
             

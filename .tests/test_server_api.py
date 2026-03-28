@@ -55,5 +55,16 @@ class TestServerAPI(BaseQATestCase):
         with urllib.request.urlopen(req) as response:
              self.assertEqual(response.status, 200)
 
+    def test_missing_api_endpoint_returns_json_404(self):
+        """Verify that fetching an unknown /api/ route returns a graceful 404 JSON, not HTML."""
+        req = urllib.request.Request(f"{self.base_url}/api/does_not_exist_at_all")
+        try:
+            with urllib.request.urlopen(req) as response:
+                self.fail("Should have thrown 404 HTTP Error")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 404)
+            data = json.loads(e.read().decode('utf-8'))
+            self.assertIn("error", data)
+
 if __name__ == '__main__':
     unittest.main()

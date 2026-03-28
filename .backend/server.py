@@ -5,10 +5,21 @@ import json
 import logging
 import subprocess
 import signal
+import time
+import uuid
+import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+# ── Sprint 9: Vault Size Cache (60s TTL) ─────────────────────────
+_vault_size_cache = {"size": 0, "expires": 0}
+
+# ── Sprint 9: In-Memory Batch Generation Queue ──────────────────
+_batch_queue = []  # list of {id, status, payload, result, error}
+_batch_lock = threading.Lock()
+_batch_worker_running = False
 
 class AIWebServer(BaseHTTPRequestHandler):
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,6 +79,10 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_get_logs()
         elif path == "/api/prompts":
             self.handle_list_prompts()
+        elif path == "/api/generate/queue":
+            self.handle_batch_queue_status()
+        elif path == "/api/gallery/tags":
+            self.handle_gallery_tags()
         else:
             self.serve_static_files(path)
 
@@ -93,6 +108,8 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_install(data)
         elif path == "/api/launch":
             self.handle_launch(data)
+        elif path == "/api/repair_dependency":
+            self.handle_repair_dependency(data)
         elif path == "/api/stop":
             self.handle_stop(data)
         elif path == "/api/uninstall":
@@ -129,6 +146,8 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_cancel_extension(data)
         elif path == "/api/vault/export":
             self.handle_vault_export(data)
+        elif path == "/api/vault/import":
+            self.handle_vault_import(data)
         elif path == "/api/vault/updates":
             self.handle_vault_updates(data)
         elif path == "/api/vault/health_check":
@@ -137,6 +156,8 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_import_scan(data)
         elif path == "/api/vault/bulk_delete":
             self.handle_vault_bulk_delete(data)
+        elif path == "/api/generate/batch":
+            self.handle_batch_generate(data)
         elif path == "/api/prompts/save":
             self.handle_save_prompt(data)
         elif path == "/api/prompts/delete":
@@ -154,7 +175,7 @@ class AIWebServer(BaseHTTPRequestHandler):
         elif path == "/api/fooocus_proxy":
             self.handle_fooocus_proxy(data)
         else:
-            self.send_error(404, "Endpoint not found")
+            self.send_json_response({"error": f"Endpoint {path} not found"}, 404)
 
     def serve_static_files(self, path):
         # Default to index.html
@@ -173,7 +194,10 @@ class AIWebServer(BaseHTTPRequestHandler):
             filepath = os.path.join(self.static_dir, path.lstrip("/"))
             
         if not os.path.exists(filepath):
-            self.send_error(404, "File Not Found")
+            if path.startswith("/api/"):
+                self.send_json_response({"error": "Endpoint not found"}, 404)
+            else:
+                self.send_error(404, "File Not Found")
             return
             
         # Basic MIME types mapping
@@ -360,6 +384,14 @@ class AIWebServer(BaseHTTPRequestHandler):
         manifest_path = os.path.join(package_path, "manifest.json")
         app_path = os.path.join(package_path, "app")
         
+        # PRE-FLIGHT 1: Recover missing manifest
+        if not os.path.exists(manifest_path) and os.path.exists(app_path):
+            recipe_path = os.path.join(self.root_dir, ".backend", "recipes", f"{package_id}.json")
+            if os.path.exists(recipe_path):
+                import shutil
+                shutil.copy2(recipe_path, manifest_path)
+                logging.info(f"Pre-flight: Auto-recovered manifest.json for {package_id}")
+
         if not os.path.exists(manifest_path) or not os.path.exists(app_path):
              self.send_json_response({"status": "error", "message": "Package improperly installed"}, 404)
              return
@@ -376,14 +408,38 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.send_json_response({"status": "error", "message": "No launch_command found in manifest"}, 400)
             return
 
+        # PRE-FLIGHT 2: Symlinks verification
+        try:
+            import sys
+            if self.root_dir not in sys.path:
+                sys.path.append(self.root_dir)
+            if os.path.join(self.root_dir, ".backend") not in sys.path:
+                sys.path.append(os.path.join(self.root_dir, ".backend"))
+            from symlink_manager import create_safe_directory_link
+            symlinks = manifest.get("model_symlinks", {})
+            vault_dir = os.path.join(self.root_dir, "Global_Vault")
+            for vault_src, app_target in symlinks.items():
+                source_path = os.path.join(vault_dir, vault_src)
+                target_path = os.path.join(app_path, app_target)
+                if not os.path.exists(target_path):
+                    os.makedirs(source_path, exist_ok=True)
+                    create_safe_directory_link(source_path, target_path)
+                    logging.info(f"Pre-flight: Recreated missing symlink for {app_target}")
+        except Exception as e:
+            logging.error(f"Pre-flight symlink check failed: {e}")
+
         # Determine python executable location
         if os.name == 'nt':
             python_exe = os.path.join(package_path, "env", "Scripts", "python.exe")
         else:
             python_exe = os.path.join(package_path, "env", "bin", "python")
             
+        # PRE-FLIGHT 3: Executable environment verification
         if not os.path.exists(python_exe):
-            self.send_json_response({"status": "error", "message": "Isolated python environment not found"}, 404)
+            self.send_json_response({
+                "status": "error", 
+                "message": "Isolated python environment not found. Please repair the installation."
+            }, 404)
             return
 
         logging.info(f"Launching {package_id}...")
@@ -403,6 +459,41 @@ class AIWebServer(BaseHTTPRequestHandler):
         AIWebServer.running_processes[package_id] = p
         
         self.send_json_response({"status": "success", "message": "Package starting..."})
+
+    def handle_repair_dependency(self, data):
+        package_id = data.get("package_id")
+        if not package_id:
+            self.send_json_response({"status": "error", "message": "Missing package_id"}, 400)
+            return
+            
+        package_path = os.path.join(self.root_dir, "packages", package_id)
+        if os.name == 'nt':
+            python_exe = os.path.join(package_path, "env", "Scripts", "python.exe")
+        else:
+            python_exe = os.path.join(package_path, "env", "bin", "python")
+            
+        req_path = os.path.join(package_path, "app", "requirements.txt")
+        if not os.path.exists(python_exe):
+            self.send_json_response({"status": "error", "message": "Python env not found"}, 404)
+            return
+            
+        logging.info(f"Auto-repairing dependencies for {package_id}...")
+        try:
+            cmd = [python_exe, "-m", "pip", "install"]
+            if os.path.exists(req_path):
+                cmd.extend(["-r", "requirements.txt"])
+            else:
+                self.send_json_response({"status": "error", "message": "requirements.txt not found"}, 404)
+                return
+                
+            kwargs = {}
+            if os.name == 'nt':
+                kwargs['creationflags'] = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 512)
+                
+            subprocess.Popen(cmd, cwd=os.path.join(package_path, "app"), **kwargs)
+            self.send_json_response({"status": "success", "message": "Repair started..."})
+        except Exception as e:
+            self.send_json_response({"status": "error", "message": f"Repair failed: {str(e)}"}, 500)
 
     def handle_stop(self, data=None):
         if hasattr(self, 'path') and getattr(self, 'command', '') == 'GET':
@@ -854,11 +945,25 @@ class AIWebServer(BaseHTTPRequestHandler):
         from urllib.parse import urlparse, parse_qs
         qs = parse_qs(urlparse(self.path).query)
         sort = qs.get("sort", ["newest"])[0]
+        tag = qs.get("tag", [""])[0]
         try:
             from metadata_db import MetadataDB
             db = MetadataDB(os.path.join(self.root_dir, ".backend", "metadata.sqlite"))
-            rows = db.list_generations(sort=sort)
+            if tag:
+                rows = db.list_generations_by_tag(tag)
+            else:
+                rows = db.list_generations(sort=sort)
             self.send_json_response({"status": "success", "generations": rows})
+        except Exception as e:
+            self.send_json_response({"status": "error", "message": str(e)}, 500)
+
+    def handle_gallery_tags(self):
+        """GET /api/gallery/tags — returns unique tags from all generations."""
+        try:
+            from metadata_db import MetadataDB
+            db = MetadataDB(os.path.join(self.root_dir, ".backend", "metadata.sqlite"))
+            tags = db.get_gallery_tags()
+            self.send_json_response({"status": "success", "tags": tags})
         except Exception as e:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
@@ -958,7 +1063,33 @@ class AIWebServer(BaseHTTPRequestHandler):
                 content = res.read().decode('utf-8')
                 self.send_json_response(json.loads(content))
         except Exception as e:
-            self.send_json_response({"error": str(e)}, 500)
+            err_msg = str(e)
+            if "Connection refused" in err_msg or "WinError 10061" in err_msg or "RemoteDisconnected" in err_msg:
+                p = AIWebServer.running_processes.get("comfyui")
+                if p and p.poll() is not None:
+                    # Process died quietly. Parse logs.
+                    log_path = os.path.join(self.root_dir, "packages", "comfyui", "runtime.log")
+                    missing_mod = None
+                    if os.path.exists(log_path):
+                        try:
+                            with open(log_path, 'r', encoding='utf-8') as f:
+                                lines = f.readlines()[-50:]
+                            for line in lines:
+                                if "ModuleNotFoundError" in line or "ImportError" in line:
+                                    missing_mod = line.strip()
+                                    break
+                        except Exception:
+                            pass
+                    
+                    if missing_mod:
+                        self.send_json_response({
+                            "error": "engine_crashed", 
+                            "message": f"Engine crashed. {missing_mod}",
+                            "missing_module": missing_mod,
+                            "repair_available": True
+                        }, 500)
+                        return
+            self.send_json_response({"error": err_msg}, 500)
 
     def handle_comfy_image(self):
         # proxy raw image bytes from comfyUI
@@ -1015,7 +1146,10 @@ class AIWebServer(BaseHTTPRequestHandler):
         import urllib.request
         url = f"http://127.0.0.1:7860{endpoint}"
         try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            if payload:
+                req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            else:
+                req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=30) as res:
                 content = res.read().decode('utf-8')
                 self.send_json_response(json.loads(content))
@@ -1040,7 +1174,10 @@ class AIWebServer(BaseHTTPRequestHandler):
         import urllib.request
         url = f"http://127.0.0.1:7861{endpoint}"
         try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            if payload:
+                req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            else:
+                req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=30) as res:
                 content = res.read().decode('utf-8')
                 self.send_json_response(json.loads(content))
@@ -1065,7 +1202,10 @@ class AIWebServer(BaseHTTPRequestHandler):
         import urllib.request
         url = f"http://127.0.0.1:8888{endpoint}"
         try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            if payload:
+                req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            else:
+                req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=30) as res:
                 content = res.read().decode('utf-8')
                 self.send_json_response(json.loads(content))
@@ -1228,7 +1368,6 @@ class AIWebServer(BaseHTTPRequestHandler):
             count = 0
             api_key = data.get("api_key", "")
             
-            import os
             for root, _, files in os.walk(vault_dir):
                 for f in files:
                     if any(f.lower().endswith(x) for x in ['.safetensors', '.ckpt', '.pt', '.bin']):
@@ -1301,6 +1440,7 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
     def handle_server_status(self):
+        global _vault_size_cache
         try:
             sys.path.insert(0, os.path.join(self.root_dir, ".backend"))
             from metadata_db import MetadataDB
@@ -1313,10 +1453,15 @@ class AIWebServer(BaseHTTPRequestHandler):
             
             downloads_file = os.path.join(self.root_dir, ".backend", "cache", "downloads.json")
             active_downloads = 0
+            recent_downloads = []
             if os.path.exists(downloads_file):
                 with open(downloads_file, 'r') as f:
                     jobs = json.load(f)
-                    active_downloads = sum(1 for j in jobs.values() if j.get("status") not in ["completed", "failed"])
+                    active_downloads = sum(1 for j in jobs.values() if j.get("status") not in ["completed", "failed", "error"])
+                    # Sprint 9: Recent completed downloads for activity feed
+                    completed = [{"id": k, **v} for k, v in jobs.items() if v.get("status") == "completed"]
+                    completed.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
+                    recent_downloads = completed[:5]
             
             # LAN sharing status
             settings_path = os.path.join(self.root_dir, ".backend", "settings.json")
@@ -1339,16 +1484,21 @@ class AIWebServer(BaseHTTPRequestHandler):
                 except Exception:
                     lan_ip = "unknown"
 
-            # Vault total size on disk
-            vault_dir = os.path.join(self.root_dir, "Global_Vault")
-            vault_size_bytes = 0
-            if os.path.exists(vault_dir):
-                for root, dirs, files in os.walk(vault_dir):
-                    for f in files:
-                        try:
-                            vault_size_bytes += os.path.getsize(os.path.join(root, f))
-                        except OSError:
-                            pass
+            # Sprint 9: Vault size with 60-second cache TTL
+            now = time.time()
+            if now >= _vault_size_cache["expires"]:
+                vault_dir = os.path.join(self.root_dir, "Global_Vault")
+                vault_size_bytes = 0
+                if os.path.exists(vault_dir):
+                    for root, dirs, files in os.walk(vault_dir):
+                        for f in files:
+                            try:
+                                vault_size_bytes += os.path.getsize(os.path.join(root, f))
+                            except OSError:
+                                pass
+                _vault_size_cache["size"] = vault_size_bytes
+                _vault_size_cache["expires"] = now + 60
+            vault_size_bytes = _vault_size_cache["size"]
 
             # Installed / running packages
             packages_dir = os.path.join(self.root_dir, "packages")
@@ -1356,6 +1506,21 @@ class AIWebServer(BaseHTTPRequestHandler):
             if os.path.exists(packages_dir):
                 installed_packages = sum(1 for d in os.listdir(packages_dir) if os.path.isdir(os.path.join(packages_dir, d)))
             running_packages = len(AIWebServer.running_processes)
+
+            # Sprint 9: Recent activity + category distribution
+            recent_generations = db.get_recent_activity(limit=5)
+            category_distribution = db.get_vault_category_distribution()
+
+            # Sprint 10: Disk space warning threshold
+            vault_size_warning_gb = 50  # default
+            settings_data = {}
+            if os.path.exists(settings_path):
+                try:
+                    with open(settings_path, 'r') as f:
+                        settings_data = json.load(f)
+                    vault_size_warning_gb = settings_data.get('vault_size_warning_gb', 50)
+                except (json.JSONDecodeError, OSError):
+                    pass
 
             self.send_json_response({
                 "unpopulated_models": unpopulated,
@@ -1369,12 +1534,174 @@ class AIWebServer(BaseHTTPRequestHandler):
                 "prompts_saved": stats.get('prompts_saved', 0),
                 "vault_size_bytes": vault_size_bytes,
                 "installed_packages": installed_packages,
-                "running_packages": running_packages
+                "running_packages": running_packages,
+                # Sprint 9: Dashboard intelligence
+                "recent_generations": recent_generations,
+                "recent_downloads": recent_downloads,
+                "category_distribution": category_distribution,
+                # Sprint 10: Disk space warning
+                "vault_size_warning_gb": vault_size_warning_gb
             })
         except Exception as e:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
+    # ── Sprint 9: Vault Import Handler ──────────────────────────────
+
+    def handle_vault_import(self, data):
+        """POST /api/vault/import — restore model metadata from exported manifest."""
+        manifest = data.get("manifest", [])
+        if not manifest:
+            self.send_json_response({"status": "error", "message": "No manifest data provided"}, 400)
+            return
+
+        try:
+            sys.path.insert(0, os.path.join(self.root_dir, ".backend"))
+            from metadata_db import MetadataDB
+            db = MetadataDB(os.path.join(self.root_dir, ".backend", "metadata.sqlite"))
+            result = db.import_models_metadata(manifest)
+            self.send_json_response({
+                "status": "success",
+                "imported": result["imported"],
+                "skipped": result["skipped"],
+                "failed": result["failed"],
+                "message": f"Imported {result['imported']} models, skipped {result['skipped']} duplicates."
+            })
+        except Exception as e:
+            self.send_json_response({"status": "error", "message": str(e)}, 500)
+
+    # ── Sprint 9: Batch Generation Queue ────────────────────────────
+
+    def handle_batch_generate(self, data):
+        """POST /api/generate/batch — add one or more payloads to the batch queue."""
+        global _batch_worker_running
+        payloads = data.get("payloads", [])
+        if not payloads:
+            # Single payload shorthand
+            payload = data.get("payload")
+            if payload:
+                payloads = [payload]
+
+        if not payloads:
+            self.send_json_response({"status": "error", "message": "No payloads provided"}, 400)
+            return
+
+        job_ids = []
+        with _batch_lock:
+            for p in payloads:
+                job_id = str(uuid.uuid4())[:8]
+                _batch_queue.append({
+                    "id": job_id,
+                    "status": "pending",
+                    "payload": p,
+                    "result": None,
+                    "error": None,
+                    "created_at": time.time()
+                })
+                job_ids.append(job_id)
+
+        # Start worker thread if not running
+        if not _batch_worker_running:
+            t = threading.Thread(target=self._batch_worker, daemon=True)
+            t.start()
+
+        self.send_json_response({
+            "status": "success",
+            "job_ids": job_ids,
+            "queue_length": len(_batch_queue),
+            "message": f"Added {len(job_ids)} job(s) to batch queue."
+        })
+
+    def handle_batch_queue_status(self):
+        """GET /api/generate/queue — returns current batch queue state."""
+        with _batch_lock:
+            queue_snapshot = [
+                {
+                    "id": j["id"],
+                    "status": j["status"],
+                    "prompt": (j.get("payload") or {}).get("prompt", "")[:80],
+                    "result": j.get("result"),
+                    "error": j.get("error"),
+                    "created_at": j.get("created_at", 0)
+                }
+                for j in _batch_queue
+            ]
+        self.send_json_response({"status": "success", "queue": queue_snapshot})
+
+    @staticmethod
+    def _batch_worker():
+        """Background worker that processes batch generation queue sequentially."""
+        global _batch_worker_running
+        _batch_worker_running = True
+        logging.info("Batch generation worker started.")
+
+        while True:
+            job = None
+            with _batch_lock:
+                for j in _batch_queue:
+                    if j["status"] == "pending":
+                        j["status"] = "running"
+                        job = j
+                        break
+
+            if not job:
+                _batch_worker_running = False
+                logging.info("Batch generation worker finished — queue empty.")
+                break
+
+            try:
+                import urllib.request
+                # Determine backend from payload
+                backend = job["payload"].get("backend", "comfyui")
+                proxy_map = {
+                    "comfyui": "http://127.0.0.1:8188",
+                    "a1111": "http://127.0.0.1:7860",
+                    "forge": "http://127.0.0.1:7861",
+                    "fooocus": "http://127.0.0.1:8888"
+                }
+                base_url = proxy_map.get(backend, "http://127.0.0.1:8188")
+
+                # Build translated payload
+                root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                sys.path.insert(0, os.path.join(root_dir, ".backend"))
+
+                if backend == "comfyui":
+                    from proxy_translators import build_comfy_workflow
+                    translated = build_comfy_workflow(job["payload"])
+                    endpoint = "/prompt"
+                elif backend in ("a1111", "forge"):
+                    from proxy_translators import build_a1111_payload
+                    translated = build_a1111_payload(job["payload"])
+                    endpoint = "/sdapi/v1/img2img" if "init_images" in translated else "/sdapi/v1/txt2img"
+                elif backend == "fooocus":
+                    from proxy_translators import build_fooocus_payload
+                    translated = build_fooocus_payload(job["payload"])
+                    endpoint = "/v1/generation/text-to-image"
+                else:
+                    translated = job["payload"]
+                    endpoint = "/prompt"
+
+                url = f"{base_url}{endpoint}"
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(translated).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'}
+                )
+                with urllib.request.urlopen(req, timeout=300) as res:
+                    content = json.loads(res.read().decode('utf-8'))
+
+                with _batch_lock:
+                    job["status"] = "done"
+                    job["result"] = content
+                logging.info(f"Batch job {job['id']} completed.")
+
+            except Exception as e:
+                with _batch_lock:
+                    job["status"] = "failed"
+                    job["error"] = str(e)
+                logging.error(f"Batch job {job['id']} failed: {e}")
+
     # ── Prompt Library Handlers ─────────────────────────────────────
+
 
     def handle_list_prompts(self):
         try:

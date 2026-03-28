@@ -47,13 +47,29 @@ def build_comfy_workflow(payload: dict) -> dict:
         clip_name = payload.get("flux_clip_l", "")
         t5_name = payload.get("flux_t5xxl", "")
         flux_guidance = float(payload.get("flux_guidance", 3.5))
-        
+
         if not unet_name:
             raise ValueError("FLUX requires a UNET model.")
-            
+        
+        if vae_name == "none":
+            import os
+            try:
+                # Resolve Global_Vault/vae path
+                vae_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Global_Vault", "vae")
+                if os.path.exists(vae_dir):
+                    vaes = [f for f in os.listdir(vae_dir) if f.endswith(('.safetensors', '.pt', '.ckpt'))]
+                    if vaes:
+                        vae_name = vaes[0]
+                    else:
+                        vae_name = "ae.safetensors"
+                else:
+                    vae_name = "ae.safetensors"
+            except:
+                vae_name = "ae.safetensors"
+
         workflow["11"] = {"inputs": {"unet_name": unet_name, "weight_dtype": "default"}, "class_type": "UNETLoader"}
         workflow["12"] = {"inputs": {"clip_name1": t5_name, "clip_name2": clip_name, "type": "flux"}, "class_type": "DualCLIPLoader"}
-        workflow["13"] = {"inputs": {"vae_name": vae_name if vae_name != "none" else "ae.safetensors"}, "class_type": "VAELoader"}
+        workflow["13"] = {"inputs": {"vae_name": vae_name}, "class_type": "VAELoader"}
         workflow["14"] = {"inputs": {"width": width, "height": height, "batch_size": 1}, "class_type": "EmptyLatentImage"}
         
         # Text Encode
@@ -80,18 +96,85 @@ def build_comfy_workflow(payload: dict) -> dict:
         
         workflow["17"] = {"inputs": {"guidance": flux_guidance, "conditioning": ["15", 0]}, "class_type": "FluxGuidance"}
         
+        pos_cond = ["17", 0]
+        neg_cond = ["16", 0]
+        final_latent_source = ["14", 0]
+        
+        # Img2Img
+        if init_image:
+            workflow["1001"] = {"inputs": {"image": init_image}, "class_type": "LoadImage"}
+            workflow["1002"] = {"inputs": {"pixels": ["1001", 0], "vae": ["13", 0]}, "class_type": "VAEEncode"}
+            final_latent_source = ["1002", 0]
+            
+        # ControlNet
+        if controlnet and controlnet.get("enable") and controlnet.get("image"):
+            cn_model = controlnet.get("model")
+            cn_strength = float(controlnet.get("strength", 1.0))
+            cn_img = controlnet.get("image")
+            
+            workflow["1003"] = {"inputs": {"control_net_name": cn_model}, "class_type": "ControlNetLoader"}
+            workflow["1004"] = {"inputs": {"image": cn_img}, "class_type": "LoadImage"}
+            workflow["1005"] = {
+                "inputs": {
+                    "strength": cn_strength,
+                    "positive": pos_cond,
+                    "negative": neg_cond,
+                    "control_net": ["1003", 0],
+                    "image": ["1004", 0]
+                },
+                "class_type": "ControlNetApplyAdvanced"
+            }
+            pos_cond = ["1005", 0]
+            neg_cond = ["1005", 1]
+
         workflow["18"] = {
             "inputs": {
                 "seed": seed, "steps": steps, "cfg": cfg, "sampler_name": sampler, "scheduler": scheduler, "denoise": denoise,
                 "model": model_source,
-                "positive": ["17", 0],
-                "negative": ["16", 0],
-                "latent_image": ["14", 0]
+                "positive": pos_cond,
+                "negative": neg_cond,
+                "latent_image": final_latent_source
             },
             "class_type": "KSampler"
         }
+        final_latent_source = ["18", 0]
         
-        workflow["19"] = {"inputs": {"samples": ["18", 0], "vae": ["13", 0]}, "class_type": "VAEDecode"}
+        # High-Res Fix / Refiner
+        if (hires and hires.get("enable")) or (refiner_name and refiner_name != "none"):
+            # Interpret refiner as hires fix
+            h_factor = float(hires.get("factor", 1.5)) if hires.get("enable") else 1.5
+            h_denoise = float(hires.get("denoise", 0.4)) if hires.get("enable") else 0.4
+            h_steps = int(hires.get("steps", steps // 2)) if hires.get("enable") else steps // 2
+            h_upscaler = hires.get("upscaler", "latent") if hires.get("enable") else "latent"
+            
+            up_params = get_hires_upscaler_params(h_upscaler)
+            
+            if up_params["type"] == "latent":
+                workflow["300"] = {
+                    "inputs": {"upscale_method": up_params["method"], "scale_by": h_factor, "samples": final_latent_source},
+                    "class_type": "LatentUpscaleBy"
+                }
+                upscaled_latent_source = ["300", 0]
+            else:
+                workflow["301"] = {"inputs": {"samples": final_latent_source, "vae": ["13", 0]}, "class_type": "VAEDecode"}
+                workflow["302"] = {
+                    "inputs": {"upscale_method": "bicubic", "scale_by": h_factor, "image": ["301", 0]},
+                    "class_type": "ImageScaleBy"
+                }
+                workflow["303"] = {"inputs": {"pixels": ["302", 0], "vae": ["13", 0]}, "class_type": "VAEEncode"}
+                upscaled_latent_source = ["303", 0]
+                
+            workflow["305"] = {
+                "inputs": {
+                    "seed": seed + 1, "steps": h_steps, "cfg": cfg, "sampler_name": sampler, "scheduler": scheduler,
+                    "denoise": h_denoise, "model": model_source,
+                    "positive": pos_cond, "negative": neg_cond, "latent_image": upscaled_latent_source
+                },
+                "class_type": "KSampler"
+            }
+            final_latent_source = ["305", 0]
+
+        workflow["19"] = {"inputs": {"samples": final_latent_source, "vae": ["13", 0]}, "class_type": "VAEDecode"}
         workflow["20"] = {"inputs": {"filename_prefix": "AIManager_Flux", "images": ["19", 0]}, "class_type": "SaveImage"}
         return {"prompt": workflow}
 
@@ -318,11 +401,30 @@ def build_a1111_payload(payload: dict) -> dict:
         
     return result
 
+def get_closest_fooocus_aspect(w, h):
+    target_ratio = w / float(h) if h > 0 else 1.0
+    # standard fooocus ratios:
+    ratios = [
+        (1024, 1024), (1152, 896), (896, 1152),
+        (1216, 832), (832, 1216), (1344, 768), 
+        (768, 1344), (1536, 640), (640, 1536)
+    ]
+    best = ratios[0]
+    best_diff = float('inf')
+    for (rw, rh) in ratios:
+        diff = abs((rw / float(rh)) - target_ratio)
+        if diff < best_diff:
+            best_diff = diff
+            best = (rw, rh)
+    return f"{best[0]}*{best[1]}"
+
 def build_fooocus_payload(payload: dict) -> dict:
+    w = payload.get('width', 1024)
+    h = payload.get('height', 1024)
     return {
         "prompt": payload.get("prompt", ""),
         "negative_prompt": payload.get("negative_prompt", ""),
         "style_selections": ["Fooocus V2", "Fooocus Enhance", "Fooocus Sharp"],
         "performance_selection": "Quality",
-        "aspect_ratios_selection": f"{payload.get('width', 1024)}*{payload.get('height', 1024)}"
+        "aspect_ratios_selection": get_closest_fooocus_aspect(w, h)
     }

@@ -95,6 +95,7 @@ packages/comfyui/
 
 ## Safety Checklist
 
+- [ ] Installs MUST BE ATOMIC. Wrap in try...except and use `shutil.rmtree(app_base)` on failure to prevent lingering broken state.
 - [ ] Never run `pip install` with system Python — always use `env/python -m pip`
 - [ ] `pip install` commands must be intercepted and rewritten to use venv python
 - [ ] Always use `subprocess.run([...])` list form, never `shell=True`

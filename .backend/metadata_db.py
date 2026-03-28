@@ -393,6 +393,122 @@ class MetadataDB:
             'prompts_saved': prompts_saved
         }
 
+    # ── Vault Import (Sprint 9) ──────────────────────────────────────
+
+    def import_models_metadata(self, manifest: list) -> dict:
+        """Imports model metadata from a vault_manifest.json export.
+        Upserts by file_hash: existing entries are updated, new entries are inserted.
+        Returns {imported: int, skipped: int, failed: list}."""
+        imported = 0
+        skipped = 0
+        failed = []
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            for entry in manifest:
+                filename = entry.get('filename')
+                vault_category = entry.get('vault_category', '')
+                file_hash = entry.get('file_hash')
+                metadata_json = entry.get('metadata_json')
+                thumbnail_path = entry.get('thumbnail_path')
+
+                if not filename or not file_hash:
+                    failed.append({'filename': filename or '(unknown)', 'reason': 'Missing filename or file_hash'})
+                    continue
+
+                # Check if already exists
+                cursor.execute('SELECT id FROM models WHERE file_hash = ?', (file_hash,))
+                existing = cursor.fetchone()
+                if existing:
+                    skipped += 1
+                    continue
+
+                cursor.execute('''
+                INSERT INTO models (filename, vault_category, file_hash, metadata_json, thumbnail_path, last_scanned)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(file_hash) DO UPDATE SET
+                    filename=excluded.filename,
+                    vault_category=excluded.vault_category,
+                    metadata_json=COALESCE(excluded.metadata_json, models.metadata_json),
+                    thumbnail_path=COALESCE(excluded.thumbnail_path, models.thumbnail_path),
+                    last_scanned=CURRENT_TIMESTAMP
+                ''', (filename, vault_category, file_hash, metadata_json, thumbnail_path))
+                imported += 1
+
+                # Restore user tags if present
+                user_tags = entry.get('user_tags', [])
+                for tag in user_tags:
+                    cursor.execute('INSERT OR IGNORE INTO user_tags (file_hash, tag) VALUES (?, ?)', (file_hash, tag))
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            failed.append({'filename': '(batch)', 'reason': str(e)})
+        finally:
+            conn.close()
+        return {'imported': imported, 'skipped': skipped, 'failed': failed}
+
+    # ── Recent Activity (Sprint 9) ─────────────────────────────────
+
+    def get_recent_activity(self, limit: int = 5) -> list:
+        """Returns the most recent generations for the dashboard activity feed."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, prompt, model, created_at, seed, width, height
+            FROM generations
+            ORDER BY id DESC
+            LIMIT ?
+        ''', (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    # ── Vault Category Distribution (Sprint 9) ─────────────────────
+
+    def get_vault_category_distribution(self) -> dict:
+        """Returns {category: count} for all models, grouped by vault_category."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT vault_category, COUNT(*) FROM models GROUP BY vault_category ORDER BY COUNT(*) DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        return {row[0]: row[1] for row in rows}
+
+    # ── Gallery Tags (Sprint 10) ───────────────────────────────────
+
+    def get_gallery_tags(self) -> list:
+        """Returns distinct tags across all generations that have non-null tags."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT tags FROM generations WHERE tags IS NOT NULL AND tags != ""')
+        rows = cursor.fetchall()
+        conn.close()
+        # Tags are comma-separated strings; split, deduplicate, and sort
+        all_tags = set()
+        for row in rows:
+            for tag in row[0].split(','):
+                tag = tag.strip()
+                if tag:
+                    all_tags.add(tag)
+        return sorted(all_tags)
+
+    def list_generations_by_tag(self, tag: str, limit: int = 100, offset: int = 0) -> list:
+        """Returns generations filtered by a tag substring match."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        like = f"%{tag}%"
+        cursor.execute(
+            'SELECT * FROM generations WHERE tags LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?',
+            (like, limit, offset)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+
 if __name__ == "__main__":
     db_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".backend", "metadata.sqlite")
     MetadataDB(db_file)

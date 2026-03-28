@@ -1,5 +1,5 @@
 # Generative AI Manager — Complete Development History
-> Auto-consolidated from all sprint walkthroughs. Last updated: 2026-03-27
+> Auto-consolidated from all sprint walkthroughs. Last updated: 2026-03-28
 
 ---
 
@@ -83,6 +83,17 @@
 - **Dashboard Analytics Widget**: 6 real-time stat cards (models, generations, vault size, packages, prompts, running engines) with gradient accents and 3-second polling
 - 24 new unit tests (all passing)
 
+## Sprint 9 — Inference Studio Power-Ups & Dashboard Intelligence
+**Conversation:** 875fb84e-e049-4345-9651-0693df9e5e78
+
+- **Vault Import from Backup**: `POST /api/vault/import` restores model metadata from exported JSON manifests with tag restoration and upsert-or-skip logic
+- **Batch Generation Queue**: In-memory sequential queue with `POST /api/generate/batch` and `GET /api/generate/queue`, background worker thread with payload translation per backend engine
+- **Prompt Token Counter**: Real-time CLIP-style token approximation with color-coded display (green/yellow/red) and model-aware limits (SD1.5=77, SDXL=154, FLUX=512)
+- **Dashboard Activity Feed**: Merged timeline showing recent generations (🎨) and downloads (📥) with clickable navigation, sorted by recency
+- **Vault Category Distribution Chart**: SVG donut chart with dynamically generated arcs, hover tooltips, and color-coded legend
+- **Vault Size Caching**: 60-second TTL cache eliminates `os.walk()` on every 3-second poll cycle
+- 31 new unit tests across 8 test classes (55 total unit tests, all passing)
+
 ---
 
 ## Cumulative API Surface
@@ -128,17 +139,22 @@
 | GET | `/api/prompts` | 7 |
 | POST | `/api/prompts` | 7 |
 | DELETE | `/api/prompts` | 7 |
+| POST | `/api/vault/import` | 9 |
+| POST | `/api/generate/batch` | 9 |
+| GET | `/api/generate/queue` | 9 |
 
 ## Architecture Summary
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  index.html (monolithic frontend, ~4500 lines)       │
+│  index.html (monolithic frontend, ~4800 lines)       │
 │  9 tabs: Dashboard, Explorer, Vault, Creations,      │
 │  Inference, AppStore, Packages, Settings + Modals     │
+│  + Activity Feed, Donut Chart, Batch Queue, Tokens    │
 ├──────────────────────────────────────────────────────┤
-│  server.py (ThreadingHTTPServer, ~1500 lines)        │
-│  40+ API endpoints, process management, proxy        │
+│  server.py (ThreadingHTTPServer, ~1700 lines)        │
+│  44 API endpoints, process management, proxy         │
+│  + batch queue worker, vault size cache               │
 ├──────────────────────────────────────────────────────┤
 │  metadata_db.py    │  installer_engine.py             │
 │  vault_crawler.py  │  civitai_client.py               │
@@ -150,3 +166,59 @@
 │  Global_Vault/             │  packages/               │
 └──────────────────────────────────────────────────────┘
 ```
+# Sprint 10 Walkthrough — UX Intelligence & Polish
+
+This document details the newly implemented features for Sprint 10 of the Generative AI Manager. Our focus shifted toward power-user UX enhancements and platform hardening, ensuring data safety and superior generation insight.
+
+## 1. My Creations Gallery Re-Architecture
+
+The generation gallery has received a massive UX overhaul.
+
+- **Star Ratings System**: Each generation card now features an interactive, inline SVG star bar. Ratings are persisted in the SQLite `generations` table and preserved across sessions. 
+- **Tag Filtering Toolbar**: A new dynamic pill-button toolbar extracts unique comma-separated strings from the `tags` column. Selecting a tag will dynamically filter the SQL results.
+- **Enhanced Lightbox**: The generation lightbox now displays the exact `Rating` in real-time alongside full metadata preservation (`Seed, Checkpoint, CFG`).
+
+> [!TIP]
+> Hovering over the stars in the lightbox will display active previews of the selection, making rapid curation feel very responsive without any page jumps.
+
+## 2. Dynamic A/B Comparison Modal
+
+To help you decide between incremental prompt or seed changes, we implemented an A/B Comparison engine.
+
+- Access the tool directly from any active Generation Lightbox using the `Compare A/B` button.
+- Select an Image A, click another item in your gallery to lock it as Image B.
+- A **Draggable Slider Handle** divides the screen, allowing you to fluently slide over the images and see exact pixel differences.
+- Full generation parameters (Prompt, Steps, CFG, Seed) are appended to the corners of each pane to trace exactly *what* caused the visual divergence.
+
+## 3. Storage Intelligence
+
+The overarching dashboard has been augmented with actionable heuristics.
+
+- **Disk Space Warning**: A custom, pulsing DOM alert displays natively below the Donut Chart when your total `Global_Vault` size breaches a configured threshold (`vault_size_warning_gb` defaulting to 50GB).
+- **Graceful Polling**: The total weight of your checkpoints, LoRAs, and VAEs are calculated, but cached with a 60-second TTL to avoid locking or lagging out the UI when navigating tabs.
+
+> [!WARNING]
+> Remember, if your main OS drive fills up unexpectedly, automatic system crashes could corrupt your SQLite metadata. Addressing disk warnings early ensures system stability.
+
+## 4. Power-User Command Palette
+
+The `Cmd+K` (`Ctrl+K`) Command Palette has been extended from 12 back-end actions to 16 commands.
+
+- **Search Vault**: `🔎 Search Models in Vault` automatically autofocuses the model explorer text input.
+- **Recent Gens**: `🖼️ View Recent Generations` swiftly navigates the user straight into the creation flow.
+- **A/B Switch**: `🔀 A/B Compare Generations` instructs users on how to initiate side-by-side mode.
+- **Theme Toggling**: `🎨 Toggle Theme` gracefully rotates through our *Dark*, *Light*, and *Glass* rendering aesthetics without forcing a page reload, syncing immediately to `localstorage`.
+
+## Quality Assurance & Automated Testing
+
+The feature set was extensively validated using a full suite of automated regression tests before being committed. The newly introduced `.backend/test_sprint10.py` expands testing scope significantly:
+
+- `TestGalleryTags`: Verifies proper deduplication, exclusion of null/empty elements, and substring logic when extracting gallery tags.
+- `TestGalleryRating`: Ensures reliable write-operations on SQLite and the preservation of numerical variables.
+- `TestServerEndpointRouting`: Mocks and calls the server handler logic, validating JSON parsing rules for both `?tag=X` overrides and `/api/server_status` integrations.
+- `TestCommandPaletteExpansion`: Verifies that the Frontend DOM effectively maintains the expanded UI widgets without syntactic errors.
+
+The overall framework test count now stands resiliently at **98 fully automated tests**.
+
+> [!NOTE]
+> All Sprints (1 through 10) are now complete. The architecture is locked, resilient, and fully automated. The application codebase will now be transitioned over to End-To-End CI stabilization and pre-release packaging.

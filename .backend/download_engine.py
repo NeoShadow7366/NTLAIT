@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import urllib.request
+import urllib.parse
+import urllib.error
 import argparse
 import time
 import logging
@@ -50,10 +52,25 @@ class Downloader:
         
         try:
             headers = {'User-Agent': 'AIManager/1.0'}
-            if api_key:
-                headers['Authorization'] = f"Bearer {api_key}"
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req) as response:
+            if api_key and api_key.strip():
+                headers['Authorization'] = f"Bearer {api_key.strip()}"
+            
+            # URL encode the URL to prevent HTTP 400 Bad Request on spaces and characters
+            safe_url = urllib.parse.quote(url, safe=':/?&=')
+            
+            class NoAuthRedirectHandler(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+                    r = super().redirect_request(req, fp, code, msg, hdrs, newurl)
+                    if r is not None:
+                        if 'Authorization' in r.unredirected_hdrs:
+                            del r.unredirected_hdrs['Authorization']
+                        if 'Authorization' in r.headers:
+                            del r.headers['Authorization']
+                    return r
+            
+            opener = urllib.request.build_opener(NoAuthRedirectHandler())
+            req = urllib.request.Request(safe_url, headers=headers)
+            with opener.open(req) as response:
                 total_size = int(response.info().get('Content-Length', 0))
                 self.update_job(job_id, {"status": "downloading", "total": total_size})
                 

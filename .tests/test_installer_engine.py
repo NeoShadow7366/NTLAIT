@@ -92,3 +92,22 @@ class TestInstallerEngine(unittest.TestCase):
         result = self.installer.uninstall("comfyui_test")
         self.assertTrue(result)
         self.assertFalse(os.path.exists(app_base))
+
+    def test_uninstallation_wipes_readonly_environment(self):
+        """Verify `rmtree` removes read-only files dynamically via the onerror chmod override."""
+        import stat
+        app_base = os.path.join(self.temp_dir, "packages", "readonly_test")
+        os.makedirs(app_base, exist_ok=True)
+        # Dummy file lock
+        filepath = os.path.join(app_base, "readonly_file.txt")
+        with open(filepath, 'w') as f:
+            f.write("strict")
+        # Ensure it is locked
+        os.chmod(filepath, stat.S_IREAD)
+        
+        result = self.installer.uninstall("readonly_test")
+        self.assertTrue(result)
+        self.assertFalse(os.path.exists(app_base))
+
+if __name__ == '__main__':
+    unittest.main()

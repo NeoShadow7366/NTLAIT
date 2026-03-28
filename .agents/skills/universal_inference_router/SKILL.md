@@ -29,9 +29,11 @@ Frontend (index.html)
 POST /api/comfy_proxy   ──→ ComfyUI    (localhost:8188)
 POST /api/a1111_proxy   ──→ A1111      (localhost:7860)
 POST /api/fooocus_proxy ──→ Fooocus    (localhost:8888)
-    │
-    ▼ (future)
 POST /api/forge_proxy   ──→ Forge      (localhost:7861)
+    │
+    ▼ (Sprint 9: Batch Queue)
+POST /api/generate/batch ──→ In-memory queue → sequential dispatch
+GET  /api/generate/queue ──→ Queue status polling
 ```
 
 ## Input Contract
@@ -80,10 +82,16 @@ On failure:
 ## Payload Translation Rules
 
 ### ComfyUI
-- Convert flat parameters into a ComfyUI workflow JSON graph
-- LoRAs become `LoraLoader` nodes chained between `CheckpointLoaderSimple` and `KSampler`
-- ControlNet becomes `ControlNetApply` node with image input
-- Img2Img sets `denoise` on `KSampler` and adds `LoadImage` node
+- Convert flat parameters into a ComfyUI workflow JSON graph (`build_comfy_workflow` in `proxy_translators.py`)
+- **SD1.5 / SDXL Block**:
+  - LoRAs become `LoraLoader` nodes chained between `CheckpointLoaderSimple` and `KSampler`.
+  - ControlNet uses `ControlNetApplyAdvanced` node with image input.
+  - Img2Img sets `denoise` on `KSampler` and adds `LoadImage` / `VAEEncode` nodes.
+- **FLUX Block**:
+  - Instantiates specific `UNETLoader`, `DualCLIPLoader` (t5xxl + clip_l), and `VAELoader`.
+  - Routes text conditioning through explicit `FluxGuidance` nodes based on `flux_guidance` parameter.
+  - Fully supports Multi-LoRA stacking, Img2Img pipelines, ControlNet constraints, and High-Res Fix (Refiner mode via `LatentUpscaleBy`) natively integrated into the FLUX execution graph.
+- **Important**: ComfyUI strictly validates nodes (Checkpoints, VAEs). If a missing `.safetensors` model is passed, it halts graph execution with an error format like `Failed to validate prompt`. Always ensure exact matching between frontend parameters (`override_settings`) and `proxy_translators.py`.
 
 ### Automatic1111 / SD WebUI
 - Maps directly to `/sdapi/v1/txt2img` or `/sdapi/v1/img2img`
@@ -101,6 +109,10 @@ On failure:
 | `.backend/server.py` → `handle_comfy_proxy()` | ComfyUI dispatch |
 | `.backend/server.py` → `handle_a1111_proxy()` | A1111 dispatch |
 | `.backend/server.py` → `handle_fooocus_proxy()` | Fooocus dispatch |
+| `.backend/server.py` → `handle_forge_proxy()` | Forge dispatch |
+| `.backend/server.py` → `handle_batch_generate()` | Batch queue submission (Sprint 9) |
+| `.backend/server.py` → `handle_batch_queue_status()` | Batch queue polling (Sprint 9) |
+| `.backend/server.py` → `_batch_worker()` | Background sequential dispatcher (Sprint 9) |
 | `.backend/server.py` → `handle_comfy_image()` | Image byte proxy for ComfyUI |
 | `.backend/server.py` → `handle_comfy_upload()` | Multipart upload proxy for img2img |
 | `.backend/static/index.html` | Frontend inference studio UI |

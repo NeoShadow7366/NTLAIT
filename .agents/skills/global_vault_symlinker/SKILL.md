@@ -57,7 +57,8 @@ mklink /J "target_link" "source_dir"
 ```
 - **No admin required** — junctions work for standard users
 - `shutil.rmtree()` on the junction removes only the link, not the target contents
-- Cannot span across drive letters (must be same volume)
+- Cannot span across drive letters (must be same volume). 
+  - **Fallback**: If symlinks fail due to volume isolation (e.g., target app is on a different drive than Global_Vault), rely on application-specific config file routing instead (e.g. creating `extra_model_paths.yaml` for ComfyUI pointing directly to Vault paths).
 
 ### UNIX (Symbolic Links)
 ```python
