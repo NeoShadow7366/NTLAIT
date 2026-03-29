@@ -25,11 +25,13 @@ You should be invoked manually via the workflows, or whenever a user asks you to
 4. If ANY `FAILED`, you must immediately read the stack trace to determine the cause of the failure.
 
 ## Self-Healing Protocol
-When a test fails:
-1. Identify if the failure is structurally dangerous (i.e. an agent broke `server.py`).
-2. Identify if the test itself needs an update (i.e. an ID changed in `index.html` intentionally).
-3. If it's a code regression, correct the `.backend/*.py` code and run tests again. 
-4. DO NOT make any adjustments to `tempfile` database or port configurations without confirming it respects `.agent/rules/qa_guardian.md`.
+When a test fails, you must follow these strict rules to ensure architectural integrity:
+
+1. **Cosmetic or Minor Fixes**: For superficial changes (e.g., updating UI locators, fixing syntax errors, or adjusting test assertions), QA Guardian may apply the fix directly and re-run tests.
+2. **Structural, Architectural, or Payload-Related Changes**: For any structural, architectural, or payload-related changes (modifying routes in `server.py`, payload shapes in `proxy_translators.py`, subprocess logic, database interactions, or JSON contracts), QA Guardian MUST escalate. It generates a proposed diff + explanation and hands it off to the Architecture Guardian for review and approval before any change is applied.
+3. **Escalation Result**: If the Architecture Guardian approves, QA Guardian may then apply the change. If rejected or needs refinement, QA Guardian reports the verdict back to the user with the Architecture Guardian's ADR reference.
+
+**CRITICAL RULE**: Never unilaterally modify core monolith files. Escalate to Architecture Guardian for all cross-boundary or infrastructure changes.
 
 ## Known Pitfalls & Lessons Learned
 

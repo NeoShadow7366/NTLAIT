@@ -22,6 +22,7 @@ class IsolatedServerThread(threading.Thread):
         self.temp_dir = temp_dir
         self.server = None
         self.port = None
+        self.startup_event = threading.Event()
 
     def run(self):
         # Override server paths to use temp folder for data isolation
@@ -32,7 +33,9 @@ class IsolatedServerThread(threading.Thread):
         server.AIWebServer.static_dir = os.path.join(PROJECT_ROOT, ".backend", "static")
         
         self.server = ThreadingHTTPServer(('localhost', 0), server.AIWebServer)
+        self.server.daemon_threads = True
         self.port = self.server.server_port
+        self.startup_event.set()
         self.server.serve_forever()
 
     def stop(self):
@@ -60,9 +63,9 @@ class BaseQATestCase(unittest.TestCase):
         cls.server_thread = IsolatedServerThread(cls.temp_dir)
         cls.server_thread.start()
         
-        # Wait for port assignment
-        while cls.server_thread.port is None:
-            pass
+        # Wait for port assignment safely
+        if not cls.server_thread.startup_event.wait(timeout=3.0):
+            raise RuntimeError("Test server failed to securely bind an ephemeral port.")
         
         cls.base_url = f"http://localhost:{cls.server_thread.port}"
 
@@ -71,6 +74,8 @@ class BaseQATestCase(unittest.TestCase):
         """Shut down the background server and delete the temporary workspace."""
         if cls.server_thread:
             cls.server_thread.stop()
-            cls.server_thread.join()
+            cls.server_thread.join(timeout=3.0)
+            if cls.server_thread.is_alive():
+                print("WARNING: Server thread heavily deadlocked and failed to join gracefully.")
         if os.path.exists(cls.temp_dir):
             shutil.rmtree(cls.temp_dir, ignore_errors=True)

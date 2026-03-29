@@ -256,6 +256,106 @@ Available skills:
 | OTA Ghost Updater | `.agents/skills/ota_ghost_updater/` | Self-healing code updates without data loss |
 | **Intelligent Model Router** | `.agents/skills/intelligent_model_router/` | AI model tier selection for development tasks |
 | **QA Guardian Agent** | `.agents/skills/qa_guardian_agent/` | Automated regression testing on save/commit |
+| **Architecture Guardian** | `.agents/skills/architecture_guardian/` | Proactive architectural integrity and zero-dependency enforcement |
+| **Runtime Health Doctor** | `.agents/skills/runtime_health_doctor/` | Proactive, read-only monitor for runtime infrastructure health |
+| **API Contract Librarian** | `.agents/skills/api_contract_librarian/` | Lightweight guardian preventing JSON payload drift between frontend and backend |
+| **Ecosystem Health Dashboard** | `.agents/skills/ecosystem_health_dashboard/` | Provides a consolidated, read-only overview of the health and status of the entire guardian ecosystem and monolith |
+| **Safe Test Runner** | `.agents/skills/safe_test_runner/` | OS-level timeout wrapper running QA tests securely to prevent infinite test hangs |
+
+---
+
+### QA Guardian Agent
+
+**Purpose**:  
+Executes automated regression testing on save or commit, parses failures, and applies self-healing corrections to maintain the integrity of the monolithic application. Strictly adheres to zero-dependency guidelines.
+
+**Self-Healing Protocol**:
+- QA Guardian now operates under strict rules to preserve architectural integrity.
+- **Cosmetic or minor fixes** (e.g., updating UI locators, syntax errors, adjusting assertions) can be applied directly by the QA Guardian, which will then re-run tests.
+- **Structural, Architectural, Payload, or Infrastructure changes** (e.g., modifying routes in `server.py`, payload shapes in `proxy_translators.py`, subprocess logic, DB interactions, or JSON contracts) MUST be escalated. It generates a proposed diff and hands it off to the Architecture Guardian for review and approval before any change is applied.
+- **CRITICAL RULE**: "Never unilaterally modify core monolith files. Escalate to Architecture Guardian for all cross-boundary or infrastructure changes."
+
+
+### Architecture Guardian (Monolith Sentinel)
+
+**Purpose**:  
+Acts as the proactive gatekeeper for software infrastructure and architectural integrity. Ensures that changes in one part of the monolithic application do not adversely affect other areas while strictly enforcing zero-dependency "Anti-Gravity" principles.
+
+**Key Responsibilities**:
+- Protection of zero-dependency rules and anti-gravity philosophy
+- Pre-change impact analysis and cross-boundary tracing (frontend → server.py → proxy_translators.py → subprocess sandboxes → Global_Vault/SQLite)
+- Prevention of JSON payload mismatches, database locking issues, zombie processes, and tight coupling
+- Live dependency mapping and safe refactoring guidance
+- Subprocess sandbox and NTFS junction integrity validation
+
+**Collaboration with QA Guardian**:
+- Architecture Guardian: Proactive design review and structural oversight (before/during major changes)
+- QA Guardian: Reactive test execution and regression validation (after save/commit)
+- Escalation path: QA Guardian escalates deep architectural failures to Architecture Guardian; Architecture Guardian escalates zero-dependency violations directly to the user
+
+**Triggers**:
+- Automatic: Edits to high-risk files (.backend/server.py, proxy_translators.py, metadata_db.py, vault_crawler.py, subprocess logic)
+- Manual: `/analyze_architecture` command
+- Phase-based: Before major refactors or new engine integrations
+
+**Output Format**:
+- Lightweight Architecture Decision Records (ADRs) saved to `.agents/architectural_decisions/`
+- Uses GitHub-style markdown alerts (> [!WARNING], > [!IMPORTANT])
+- Chat summary with Risk Level, Coupling Warnings, and Verdict (Proceed / Refactor / Blocked)
+
+**How to Invoke**:
+- `/analyze_architecture` — Analyze current or proposed changes
+- Mention "Architecture Guardian" or "Monolith Sentinel" in any prompt for targeted review
+
+---
+
+### Runtime Health Doctor (Infra Doctor)
+
+**Purpose**:  
+Proactive, read-only monitor for live runtime infrastructure health. Detects zombie subprocesses, broken NTFS junctions, SQLite lock/contention issues, and manifest integrity problems without performing any mutations.
+
+**Key Responsibilities**:
+- Pre-flight checks before generation or server operations (manifest.json, Global_Vault junctions, metadata.sqlite accessibility)
+- Safe surveillance for lingering engine processes (ComfyUI/Forge sandboxes)
+- Detection of potential pipe deadlocks or vault_crawler contention
+- Clear health reporting with risk levels (Green/Yellow/Red) and non-destructive recommendations
+
+**Integration**:
+- Escalates structural or recurring issues to Architecture Guardian for ADRs and long-term fixes
+- Provides runtime context to QA Guardian when tests fail due to infrastructure problems
+- Triggers: Automatic before generations / on startup; Manual via `/run_health_check` or "Doctor, check system health."
+
+**Output**: Concise markdown reports using > [!NOTE], > [!WARNING], > [!CRITICAL] alerts.
+
+**How to Invoke**: `/run_health_check`
+
+---
+
+### API Contract Librarian
+
+**Purpose**:  
+Lightweight skill responsible for preventing JSON payload drift between the Vanilla JS frontend (`static/index.html`) and the Python backend (`.backend/server.py` + `proxy_translators.py`). Maintains a living reference document of API endpoint contracts.
+
+**Key Responsibilities**:
+- Maps major API endpoints, request shapes, and response structures
+- Detects and warns about potential payload mismatches or special-case handling (e.g., multipart FormData bypasses)
+- Updates the living contract file at `.agents/contracts/api_contracts.md`
+- Supports the Architecture Guardian during code reviews of boundary files
+
+**Integration**:
+- Automatically triggered by Architecture Guardian when changes occur in server.py, proxy_translators.py, or index.html fetch() logic
+- Manual trigger: `/update_api_contracts`
+
+**Output**:
+- Markdown report with endpoint tables and drift analysis
+- Uses > [!NOTE] and > [!WARNING] alerts
+- Writes to `.agents/contracts/api_contracts.md`
+
+**Current Status** (as of latest sync):
+- Core inference proxies and infrastructure endpoints documented
+- Special warning noted on `/api/comfy_upload` multipart handling
+
+**How to Invoke**: `/update_api_contracts`
 
 ---
 

@@ -22,7 +22,7 @@ class TestFrontendSmoke(BaseQATestCase):
     def test_index_html_loads(self):
         """Verify index.html can be served successfully."""
         req = urllib.request.Request(f"{self.base_url}/")
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=5.0) as response:
             self.assertEqual(response.status, 200)
             html_content = response.read().decode('utf-8')
             
