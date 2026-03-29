@@ -83,6 +83,8 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.handle_batch_queue_status()
         elif path == "/api/gallery/tags":
             self.handle_gallery_tags()
+        elif path == "/api/civitai_search":
+            self.handle_civitai_search()
         else:
             self.serve_static_files(path)
 
@@ -221,6 +223,84 @@ class AIWebServer(BaseHTTPRequestHandler):
             self.wfile.write(content)
         except Exception as e:
             self.send_error(500, f"Server Error: {str(e)}")
+
+    def handle_civitai_search(self):
+        try:
+            from urllib.parse import urlparse, parse_qs
+            import urllib.request
+            qs = parse_qs(urlparse(self.path).query)
+            query = qs.get("query", [""])[0]
+            type_filter = qs.get("type", [""])[0]
+            
+            payload = {
+                "queries": [
+                    {
+                        "q": query,
+                        "indexUid": "models_v9",
+                        "limit": 40,
+                        "offset": 0
+                    }
+                ]
+            }
+            
+            filters = []
+            if type_filter and type_filter != "Text Encoder":
+                filters.append(f'(type="{type_filter}")')
+            if filters:
+                payload["queries"][0]["filter"] = " AND ".join(filters)
+            
+            url = "https://search-new.civitai.com/multi-search"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer 8c46eb2508e21db1e9828a97968d91ab1ca1caa5f70a00e88a2ba1e286603b61",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://civitai.com/",
+                "Origin": "https://civitai.com"
+            }
+            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as res:
+                ms_data = json.loads(res.read().decode('utf-8'))
+            
+            hits = ms_data.get("results", [{}])[0].get("hits", [])
+            
+            items = []
+            for h in hits:
+                version = h.get("version", {})
+                images = h.get("images", [])
+                mapped_imgs = []
+                for img in images:
+                    img_id = img.get("url") or img.get("id")
+                    if img_id and not str(img_id).startswith("http"):
+                        img_url = f"https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{img_id}/width=450/image.jpeg"
+                    else:
+                        img_url = img_id
+                    mapped_imgs.append({
+                        "url": img_url,
+                        "type": img.get("type", "image")
+                    })
+                
+                v1_item = {
+                    "id": h.get("id"),
+                    "name": h.get("name"),
+                    "type": h.get("type", "Model"),
+                    "nsfw": h.get("nsfw", False),
+                    "creator": {"username": h.get("user", {}).get("username", "Unknown")},
+                    "stats": {"downloadCount": h.get("metrics", {}).get("downloadCount", 0)},
+                    "modelVersions": [{
+                        "name": version.get("name", "Base"),
+                        "baseModel": version.get("baseModel", "Unknown"),
+                        "images": mapped_imgs,
+                        "files": [{"sizeKB": 0, "name": "ModelFile", "type": "Model", "primary": True}],
+                        "trainedWords": h.get("triggerWords", [])
+                    }],
+                    "tags": h.get("tags", [])
+                }
+                items.append(v1_item)
+                
+            self.send_json_response({"items": items})
+        except Exception as e:
+            logging.error(f"Target CivitAI proxy search failed: {e}")
+            self.send_json_response({"error": str(e), "items": []}, 500)
 
     def send_api_models(self):
         try:

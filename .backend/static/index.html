@@ -2637,6 +2637,12 @@
             if(idMatch) {
                 isExactId = true;
                 url = new URL(`https://civitai.com/api/v1/models/${idMatch[1]}`);
+            } else if (q) {
+                url = new URL(window.location.origin + '/api/civitai_search');
+                url.searchParams.append('query', q);
+                url.searchParams.append('nsfw', nsfw);
+                if(type) url.searchParams.append('type', type);
+                if(base) url.searchParams.append('base', base);
             } else {
                 url = new URL('https://civitai.com/api/v1/models');
                 url.searchParams.append('limit', '40');
@@ -2647,10 +2653,9 @@
                 }
                 url.searchParams.append('nsfw', nsfw);
                 if(early === 'true') url.searchParams.append('earlyAccess', 'true');
-                if(q) url.searchParams.append('query', q);
                 if(type) {
                     if(type === 'Text Encoder') {
-                        if(!q) url.searchParams.append('query', 'text encoder clip');
+                        url.searchParams.append('query', 'text encoder clip');
                     } else {
                         url.searchParams.append('types', type);
                     }
@@ -2690,31 +2695,7 @@
                     return sort === 'Size High' ? sizeB - sizeA : sizeA - sizeB;
                 });
             } else if (sort === 'Search Match') {
-                const queryStr = (document.getElementById('ex-search').value || '').toLowerCase().trim();
-                if (queryStr) {
-                    const terms = queryStr.split(/\s+/);
-                    items.forEach(item => {
-                        let score = 0;
-                        const name = (item.name || '').toLowerCase();
-                        const desc = (item.description || '').toLowerCase();
-                        
-                        if (name === queryStr) score += 100;
-                        else if (name.includes(queryStr)) score += 50;
-                        
-                        terms.forEach(term => {
-                            if (name.includes(term)) score += 10;
-                            if (desc.includes(term)) score += 2;
-                            if (item.tags && Array.isArray(item.tags)) {
-                                item.tags.forEach(tag => {
-                                    const tagStr = (typeof tag === 'string' ? tag : (tag.name||'')).toLowerCase();
-                                    if (tagStr.includes(term)) score += 5;
-                                });
-                            }
-                        });
-                        item._searchScore = score;
-                    });
-                    items.sort((a, b) => (b._searchScore || 0) - (a._searchScore || 0));
-                }
+                // Trust the server-side Meilisearch relevancy ranking
             }
 
             const hideInstalled = document.getElementById('ex-installed').checked;

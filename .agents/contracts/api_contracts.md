@@ -69,6 +69,7 @@ These endpoints receive the unified frontend generation parameters and translate
 | `/api/install` | POST | `{"recipe_id": "string"}` | `{"status": "success", "message": "..."}` |
 | `/api/launch` | POST | `{"package_id": "string"}` | `{"status": "success", "message": "..."}` |
 | `/api/models` | GET | *None (Query Params: limit, offset)* | `{"status": "success", "models": [...], "total": int}` |
+| `/api/civitai_search` | GET | *None (Query Params: query, type)* | `{"items": [...]}` |
 | `/api/repair_dependency` | POST | `{"package_id": "string"}` | `{"status": "success", "message": "..."}` |
 
 ## Latest Drift Status
