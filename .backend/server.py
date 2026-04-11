@@ -290,6 +290,7 @@ class AIWebServer(
         "/api/civitai_search":      "handle_civitai_search",
         "/api/ollama/status":       "handle_ollama_status",
         "/api/favorites":           "handle_get_favorites",
+        "/api/events":              "handle_event_stream",
     }
 
     _POST_ROUTES = {
@@ -650,6 +651,10 @@ class AIWebServer(
         """Background worker that processes batch generation queue sequentially."""
         global _batch_worker_running
         logging.info("Batch generation worker started.")
+        try:
+            from event_bus import event_bus as _bus
+        except ImportError:
+            _bus = None
 
         while True:
             job = None
@@ -704,12 +709,16 @@ class AIWebServer(
                         job["result"] = {k: v for k, v in content.items() if k != "images"}
                         job["result"]["_image_count"] = len(content["images"])
                 logging.info(f"Batch job {job['id']} completed.")
+                if _bus:
+                    _bus.emit("batch_update", {"id": job["id"], "status": "done"})
 
             except Exception as e:
                 with _batch_lock:
                     job["status"] = "failed"
                     job["error"] = str(e)
                 logging.error(f"Batch job {job['id']} failed: {e}")
+                if _bus:
+                    _bus.emit("batch_update", {"id": job["id"], "status": "failed", "error": str(e)})
 
 
 
@@ -785,6 +794,76 @@ def start_background_scanners():
     t = threading.Thread(target=_run_scanners, daemon=True)
     t.start()
     print("[SERVER] Background scanners thread started.")
+
+    # ── SSE Event Emitter Thread ──────────────────────────────
+    def _sse_emitter():
+        """Background thread that pushes state changes to the SSE EventBus.
+
+        Polls download/install progress files and server metrics, emitting
+        events when changes are detected. This enables the frontend to replace
+        setInterval polling with a single EventSource connection.
+        """
+        try:
+            from event_bus import event_bus
+        except ImportError:
+            logging.warning("event_bus not available, SSE emitter disabled")
+            return
+
+        _last_dl_hash = None
+        _last_install_hash = None
+
+        while True:
+            try:
+                # ── Download Progress ──
+                dl_file = os.path.join(root_dir, ".backend", "cache", "downloads.json")
+                if os.path.exists(dl_file):
+                    try:
+                        with open(dl_file, 'r') as f:
+                            dl_data = json.load(f)
+                        # Only emit if changed (simple hash of status values)
+                        dl_hash = str({k: v.get("status") for k, v in dl_data.items()})
+                        if dl_hash != _last_dl_hash:
+                            _last_dl_hash = dl_hash
+                            active = {k: v for k, v in dl_data.items()
+                                      if v.get("status") not in ("completed", "failed", "error")}
+                            event_bus.emit("download_progress", {
+                                "active_count": len(active),
+                                "jobs": dl_data
+                            })
+                    except (json.JSONDecodeError, OSError):
+                        pass
+
+                # ── Install Progress ──
+                inst_file = os.path.join(root_dir, ".backend", "cache", "install_jobs.json")
+                if os.path.exists(inst_file):
+                    try:
+                        with open(inst_file, 'r') as f:
+                            inst_data = json.load(f)
+                        inst_hash = str({k: v.get("status") for k, v in inst_data.items()})
+                        if inst_hash != _last_install_hash:
+                            _last_install_hash = inst_hash
+                            event_bus.emit("install_progress", inst_data)
+                    except (json.JSONDecodeError, OSError):
+                        pass
+
+                # ── Server Status (every iteration = ~2s) ──
+                try:
+                    running_count = AIWebServer.running_processes.count_running()
+                    event_bus.emit("server_status", {
+                        "running_packages": running_count,
+                        "timestamp": time.time()
+                    })
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logging.debug(f"SSE emitter cycle error: {e}")
+
+            time.sleep(2)  # 2-second emission cycle
+
+    sse_thread = threading.Thread(target=_sse_emitter, daemon=True, name="sse-emitter")
+    sse_thread.start()
+    logging.info("SSE event emitter thread started.")
 
 def run_server(port=8080):
     global global_http_server

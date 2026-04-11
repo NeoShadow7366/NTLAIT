@@ -215,3 +215,54 @@ class SystemHandlersMixin:
             self.send_json_response({"status": "success"})
         except Exception as e:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
+
+    def handle_event_stream(self):
+        """GET /api/events — Server-Sent Events stream.
+
+        Keeps the connection open and pushes events as they arrive.
+        Uses EventBus.wait_for_events() with Condition-based blocking
+        instead of busy-polling. Auto-reconnection supported via Last-Event-ID.
+        """
+        from event_bus import event_bus, format_sse
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        # Support reconnection via Last-Event-ID header
+        last_id = 0
+        last_event_id = self.headers.get("Last-Event-ID")
+        if last_event_id:
+            try:
+                last_id = int(last_event_id)
+            except (ValueError, TypeError):
+                pass
+
+        try:
+            # Send initial heartbeat so client knows connection is alive
+            self.wfile.write(b": connected\n\n")
+            self.wfile.flush()
+
+            while True:
+                events = event_bus.wait_for_events(last_id=last_id, timeout=15.0)
+
+                if events:
+                    for event in events:
+                        self.wfile.write(format_sse(event))
+                        last_id = event["id"]
+                    self.wfile.flush()
+                else:
+                    # Send heartbeat comment to keep connection alive
+                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
+
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            # Client disconnected — this is normal for SSE
+            logging.debug("SSE client disconnected")
+        except Exception as e:
+            logging.error(f"SSE stream error: {e}")
+

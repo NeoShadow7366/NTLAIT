@@ -90,6 +90,96 @@
                 if(data.status === 'success') loadPromptLibrary();
             } catch(e) { alert('Error: ' + e.message); }
         }
+        // ═══ Server-Sent Events (SSE) Client ══════════════════════════
+        // Replaces multiple setInterval polling loops with a single
+        // persistent connection. Events are dispatched to handler functions
+        // that may be defined in any module.
+        (function initSSE() {
+            if (typeof EventSource === 'undefined') {
+                console.warn('SSE not supported in this browser, falling back to polling');
+                return;
+            }
+
+            let sse = null;
+            let retryCount = 0;
+
+            function connect() {
+                sse = new EventSource('/api/events');
+
+                sse.onopen = () => {
+                    retryCount = 0;
+                    console.log('[SSE] Connected to event stream');
+                };
+
+                // Download progress events
+                sse.addEventListener('download_progress', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (typeof window._onSSEDownloadProgress === 'function') {
+                            window._onSSEDownloadProgress(data);
+                        }
+                    } catch (err) { console.debug('[SSE] download_progress parse error', err); }
+                });
+
+                // Install progress events
+                sse.addEventListener('install_progress', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (typeof window._onSSEInstallProgress === 'function') {
+                            window._onSSEInstallProgress(data);
+                        }
+                    } catch (err) { console.debug('[SSE] install_progress parse error', err); }
+                });
+
+                // Server status events
+                sse.addEventListener('server_status', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (typeof window._onSSEServerStatus === 'function') {
+                            window._onSSEServerStatus(data);
+                        }
+                    } catch (err) { console.debug('[SSE] server_status parse error', err); }
+                });
+
+                // Batch queue events
+                sse.addEventListener('batch_update', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (typeof window._onSSEBatchUpdate === 'function') {
+                            window._onSSEBatchUpdate(data);
+                        }
+                    } catch (err) { console.debug('[SSE] batch_update parse error', err); }
+                });
+
+                // Vault crawler events
+                sse.addEventListener('vault_crawl', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (typeof window._onSSEVaultCrawl === 'function') {
+                            window._onSSEVaultCrawl(data);
+                        }
+                    } catch (err) { console.debug('[SSE] vault_crawl parse error', err); }
+                });
+
+                sse.onerror = () => {
+                    // EventSource auto-reconnects, but log for debugging
+                    retryCount++;
+                    if (retryCount <= 3) {
+                        console.debug('[SSE] Connection error, auto-reconnecting...');
+                    }
+                };
+            }
+
+            // Connect after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', connect);
+            } else {
+                connect();
+            }
+
+            // Expose for debugging
+            window._sseConnection = { getState: () => sse ? sse.readyState : -1 };
+        })();
 
         // Init
         loadExplorer();
