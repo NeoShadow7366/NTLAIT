@@ -310,6 +310,16 @@ class PackageHandlersMixin:
         except Exception as e:
             logging.error(f"Pre-flight symlink check failed: {e}")
 
+        # PRE-FLIGHT 4: Git safe.directory (prevents 'dubious ownership' on cloned repos)
+        if os.path.isdir(os.path.join(app_path, ".git")):
+            try:
+                subprocess.run(
+                    ["git", "config", "--global", "--add", "safe.directory",
+                     app_path.replace("\\", "/")],
+                    timeout=10, capture_output=True
+                )
+            except Exception:
+                pass  # Non-critical
         # Determine python executable location
         if os.name == 'nt':
             python_exe = os.path.join(package_path, "env", "Scripts", "python.exe")
@@ -355,37 +365,92 @@ class PackageHandlersMixin:
         self.send_json_response({"status": "success", "message": "Package starting...", "url": url, "port": port})
 
     def handle_repair_dependency(self, data):
+        """Auto-repair dependencies: bootstrap pip, upgrade setuptools, install requirements."""
         package_id = data.get("package_id")
         if not package_id:
             self.send_json_response({"status": "error", "message": "Missing package_id"}, 400)
             return
 
         package_path = os.path.join(self.root_dir, "packages", package_id)
+        app_path = os.path.join(package_path, "app")
         if os.name == 'nt':
             python_exe = os.path.join(package_path, "env", "Scripts", "python.exe")
         else:
             python_exe = os.path.join(package_path, "env", "bin", "python")
 
-        req_path = os.path.join(package_path, "app", "requirements.txt")
         if not os.path.exists(python_exe):
             self.send_json_response({"status": "error", "message": "Python env not found"}, 404)
             return
 
         logging.info(f"Auto-repairing dependencies for {package_id}...")
-        try:
-            cmd = [python_exe, "-m", "pip", "install"]
-            if os.path.exists(req_path):
-                cmd.extend(["-r", "requirements.txt"])
-            else:
-                self.send_json_response({"status": "error", "message": "requirements.txt not found"}, 404)
-                return
+        repair_steps = []
 
+        try:
             kwargs = {}
             if os.name == 'nt':
                 kwargs['creationflags'] = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 512)
 
-            subprocess.Popen(cmd, cwd=os.path.join(package_path, "app"), **kwargs)
-            self.send_json_response({"status": "success", "message": "Repair started..."})
+            # Step 1: Add git safe.directory to prevent dubious ownership errors
+            if os.path.isdir(os.path.join(app_path, ".git")):
+                try:
+                    subprocess.run(
+                        ["git", "config", "--global", "--add", "safe.directory",
+                         app_path.replace("\\", "/")],
+                        timeout=10, capture_output=True
+                    )
+                    repair_steps.append("git safe.directory configured")
+                except Exception:
+                    pass  # Non-critical
+
+            # Step 2: Bootstrap pip if missing
+            pip_check = subprocess.run(
+                [python_exe, "-m", "pip", "--version"],
+                capture_output=True, timeout=15
+            )
+            if pip_check.returncode != 0:
+                logging.info(f"  pip not found, bootstrapping via ensurepip...")
+                ensurepip_result = subprocess.run(
+                    [python_exe, "-m", "ensurepip", "--upgrade"],
+                    capture_output=True, timeout=120, **kwargs
+                )
+                if ensurepip_result.returncode == 0:
+                    repair_steps.append("pip bootstrapped via ensurepip")
+                else:
+                    self.send_json_response({
+                        "status": "error",
+                        "message": "Failed to bootstrap pip: " + ensurepip_result.stderr.decode(errors='replace')[-200:]
+                    }, 500)
+                    return
+
+            # Step 3: Upgrade pip + setuptools (fixes 'no module pkg_resources')
+            subprocess.run(
+                [python_exe, "-m", "pip", "install", "--upgrade", "pip", "setuptools"],
+                capture_output=True, timeout=120, **kwargs
+            )
+            repair_steps.append("pip + setuptools upgraded")
+
+            # Step 4: Install requirements
+            req_candidates = ["requirements.txt", "requirements_versions.txt"]
+            req_path = None
+            for candidate in req_candidates:
+                full_path = os.path.join(app_path, candidate)
+                if os.path.exists(full_path):
+                    req_path = full_path
+                    break
+
+            if req_path:
+                subprocess.Popen(
+                    [python_exe, "-m", "pip", "install", "-r", os.path.basename(req_path)],
+                    cwd=app_path, **kwargs
+                )
+                repair_steps.append(f"installing {os.path.basename(req_path)} (background)")
+            else:
+                repair_steps.append("no requirements file found, skipped")
+
+            self.send_json_response({
+                "status": "success",
+                "message": "Repair started: " + " → ".join(repair_steps)
+            })
         except Exception as e:
             self.send_json_response({"status": "error", "message": f"Repair failed: {str(e)}"}, 500)
 
