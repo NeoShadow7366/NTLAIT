@@ -29,7 +29,7 @@ class PackageHandlersMixin:
         POST /api/stop            → handle_stop
         POST /api/restart         → handle_restart
         POST /api/uninstall       → handle_uninstall
-        POST /api/repair/dependency → handle_repair_dependency
+        POST /api/repair_dependency → handle_repair_dependency
         POST /api/repair/install  → handle_repair_install
         GET  /api/extensions      → handle_get_extensions
         POST /api/extensions/install → handle_install_extension
