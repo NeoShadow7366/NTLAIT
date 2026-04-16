@@ -346,8 +346,41 @@ class PackageHandlersMixin:
 
         logging.info(f"Launching {package_id}...")
 
+        # PRE-FLIGHT 5: Port availability check (BUG-3 fix)
+        _fallback_ports = {"comfyui": 8188, "forge": 7860, "auto1111": 7861, "fooocus": 8888}
+        port = manifest.get("port", _fallback_ports.get(package_id, 7860))
+        try:
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                if s.connect_ex(('127.0.0.1', port)) == 0:
+                    self.send_json_response({
+                        "status": "error",
+                        "message": f"Port {port} is already in use. Another instance may be running, or another app (e.g. Stability Matrix) is occupying this port. Stop it first or change the port in the recipe.",
+                        "port_conflict": True
+                    }, 409)
+                    return
+        except Exception:
+            pass  # Non-blocking — allow launch to proceed if socket check itself fails
+
         # Pipe output to a runtime log file (append mode preserves history)
         log_path = os.path.join(package_path, "runtime.log")
+
+        # S-4: Log rotation — cap at 5MB to prevent disk bloat on long sessions
+        _LOG_MAX_BYTES = 5 * 1024 * 1024   # 5 MB trigger
+        _LOG_KEEP_BYTES = 2 * 1024 * 1024  # Keep last 2 MB
+        try:
+            if os.path.exists(log_path) and os.path.getsize(log_path) > _LOG_MAX_BYTES:
+                with open(log_path, 'rb') as f:
+                    f.seek(-_LOG_KEEP_BYTES, 2)
+                    tail = f.read()
+                with open(log_path, 'wb') as f:
+                    f.write(b"\n[Log rotated - older entries trimmed]\n\n")
+                    f.write(tail)
+                logging.info(f"Rotated runtime.log for {package_id} (was > 5MB)")
+        except Exception as e:
+            logging.warning(f"Log rotation skipped for {package_id}: {e}")
+
         try:
             log_file = open(log_path, 'a', encoding='utf-8')
             log_file.write(f"\n{'='*60}\n")
@@ -366,9 +399,6 @@ class PackageHandlersMixin:
             kwargs['creationflags'] = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 512)
 
         p = subprocess.Popen(full_command, cwd=app_path, stdout=log_file, stderr=subprocess.STDOUT, **kwargs)
-
-        _fallback_ports = {"comfyui": 8188, "forge": 7860, "auto1111": 7861, "fooocus": 8888}
-        port = manifest.get("port", _fallback_ports.get(package_id, 7860))
 
         AIWebServer.running_processes.register(package_id, p, log_file=log_file, port=port)
         url = f"http://127.0.0.1:{port}"
@@ -511,9 +541,13 @@ class PackageHandlersMixin:
 
                 # Step 4+: Execute install_commands from recipe (includes CUDA PyTorch)
                 if install_commands:
+                    from installer_engine import resolve_pytorch_command
                     for i, cmd in enumerate(install_commands):
                         current_step += 1
                         pct = int(current_step / total_steps * 100)
+
+                        # S-5: Resolve platform-aware PyTorch index URL
+                        cmd = resolve_pytorch_command(cmd)
 
                         # Convert pip commands to use the venv python
                         if cmd.startswith("pip "):
@@ -697,7 +731,7 @@ class PackageHandlersMixin:
             package_id = qs.get("package_id", [""])[0]
             if not self._validate_package_id(package_id):
                 return
-            target_dir = os.path.join(self.root_dir, "packages", package_id, "custom_nodes")
+            target_dir = os.path.join(self.root_dir, "packages", package_id, "app", "custom_nodes")
             extensions = []
             if os.path.exists(target_dir):
                 for folder in os.listdir(target_dir):
@@ -716,7 +750,7 @@ class PackageHandlersMixin:
         if not repo_url:
             self.send_json_response({"status": "error", "message": "Missing repo_url"}, 400)
             return
-        target_dir = os.path.join(self.root_dir, "packages", package_id, "custom_nodes")
+        target_dir = os.path.join(self.root_dir, "packages", package_id, "app", "custom_nodes")
         os.makedirs(target_dir, exist_ok=True)
         job_id = str(uuid.uuid4())[:8]
         try:
@@ -773,7 +807,7 @@ class PackageHandlersMixin:
         if not ext_name or ".." in ext_name or "/" in ext_name or "\\" in ext_name:
             self.send_json_response({"status": "error", "message": "Invalid ext_name"}, 403)
             return
-        target_path = os.path.join(self.root_dir, "packages", package_id, "custom_nodes", ext_name)
+        target_path = os.path.join(self.root_dir, "packages", package_id, "app", "custom_nodes", ext_name)
         if not os.path.exists(target_path):
             self.send_json_response({"status": "error", "message": "Extension not found"}, 404)
             return
@@ -1010,8 +1044,15 @@ class PackageHandlersMixin:
                 continue
             lines.append(f"{section_name}:\n")
             for key, value in entries.items():
-                # Quote paths containing spaces or backslashes
-                if ' ' in str(value) or '\\' in str(value):
+                # Normalize backslashes to forward slashes to prevent YAML
+                # escape character errors (e.g. \A, \S treated as invalid escapes
+                # inside double-quoted YAML strings).
+                value = str(value).replace('\\', '/')
+                # Strip trailing slash from base_path to avoid // in resolved paths
+                if key == 'base_path':
+                    value = value.rstrip('/')
+                # Quote paths containing spaces
+                if ' ' in value:
                     lines.append(f"    {key}: \"{value}\"\n")
                 else:
                     lines.append(f"    {key}: {value}\n")
