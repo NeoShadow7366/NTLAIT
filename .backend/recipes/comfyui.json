@@ -18,5 +18,5 @@
     "embeddings": "models/embeddings"
   },
   "port": 8188,
-  "launch_command": "main.py"
+  "launch_command": "main.py --port 8188 --preview-method auto"
 }

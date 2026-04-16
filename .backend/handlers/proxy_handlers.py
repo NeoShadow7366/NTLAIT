@@ -12,6 +12,19 @@ import urllib.error
 
 _PROMPT_MAX_CHARS = 10000  # R-12: Reject absurdly long prompts before engine dispatch
 
+# BUG-4 fix: Expanded crash patterns for richer diagnostics
+_CRASH_PATTERNS = [
+    ("ModuleNotFoundError", "missing_module", "Missing Python dependency. Use Repair to fix."),
+    ("ImportError", "missing_module", "Missing Python dependency. Use Repair to fix."),
+    ("CUDA out of memory", "cuda_oom", "GPU ran out of VRAM. Try a smaller resolution or close other GPU apps."),
+    ("torch.cuda.OutOfMemoryError", "cuda_oom", "GPU ran out of VRAM. Try a smaller resolution or close other GPU apps."),
+    ("RuntimeError: CUDA", "cuda_error", "CUDA runtime error. Check GPU drivers and restart."),
+    ("PermissionError", "permission_error", "File permission denied. Check folder access rights."),
+    ("Address already in use", "port_in_use", "Port is already occupied. Close the other process first."),
+    ("OSError: [WinError 10048]", "port_in_use", "Port is already occupied. Close the other process first."),
+    ("OSError: [Errno 98]", "port_in_use", "Port is already occupied. Close the other process first."),
+]
+
 
 class ProxyHandlersMixin:
     """Proxy domain handlers for the AIWebServer class.
@@ -24,6 +37,48 @@ class ProxyHandlersMixin:
         POST /api/forge_proxy    → handle_forge_proxy
         POST /api/fooocus_proxy  → handle_fooocus_proxy
     """
+
+    # ── BUG-1 fix: Centralized ComfyUI URL/header helpers (no hardcoded port) ──
+
+    @staticmethod
+    def _comfy_port() -> int:
+        """Resolve ComfyUI port from engine config (single source of truth)."""
+        from server import _ENGINE_CONFIG
+        return _ENGINE_CONFIG.get("comfyui", {}).get("port", 8188)
+
+    def _comfy_base_url(self) -> str:
+        return f"http://127.0.0.1:{self._comfy_port()}"
+
+    def _comfy_headers(self) -> dict:
+        """ComfyUI v0.18+ requires matching Origin/Host headers."""
+        port = self._comfy_port()
+        return {
+            'Origin': f'http://127.0.0.1:{port}',
+            'Host': f'127.0.0.1:{port}',
+        }
+
+    @staticmethod
+    def _parse_crash_log(log_path: str) -> dict | None:
+        """Parse runtime.log for known crash patterns. Returns structured error or None."""
+        if not os.path.exists(log_path):
+            return None
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()[-50:]
+        except Exception:
+            return None
+
+        for line in lines:
+            for pattern, error_type, user_msg in _CRASH_PATTERNS:
+                if pattern in line:
+                    return {
+                        "error": "engine_crashed",
+                        "error_type": error_type,
+                        "message": f"Engine crashed. {user_msg}",
+                        "detail": line.strip(),
+                        "repair_available": error_type == "missing_module"
+                    }
+        return None
 
     def handle_comfy_proxy(self, data):
         from server import _ENGINE_CONFIG, AIWebServer
@@ -62,19 +117,16 @@ class ProxyHandlersMixin:
                 self.send_json_response({"error": str(e)}, 400)
                 return
 
-        url = f"http://127.0.0.1:8188{endpoint}"
+        url = f"{self._comfy_base_url()}{endpoint}"
         # ComfyUI v0.18+ validates Origin/Host — match them to avoid 403
-        _comfy_headers = {
-            'Origin': 'http://127.0.0.1:8188',
-            'Host': '127.0.0.1:8188',
-        }
+        _comfy_hdrs = self._comfy_headers()
 
         try:
             if payload:
-                headers = {**_comfy_headers, 'Content-Type': 'application/json'}
+                headers = {**_comfy_hdrs, 'Content-Type': 'application/json'}
                 req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
             else:
-                req = urllib.request.Request(url, headers=_comfy_headers)
+                req = urllib.request.Request(url, headers=_comfy_hdrs)
 
             with urllib.request.urlopen(req, timeout=300) as res:
                 content = res.read().decode('utf-8')
@@ -91,27 +143,11 @@ class ProxyHandlersMixin:
                 entry = AIWebServer.running_processes.get("comfyui")
                 p = entry.get("process") if entry else None
                 if p and p.poll() is not None:
-                    # Process died quietly. Parse logs.
+                    # Process died — parse logs with expanded crash patterns
                     log_path = os.path.join(self.root_dir, "packages", "comfyui", "runtime.log")
-                    missing_mod = None
-                    if os.path.exists(log_path):
-                        try:
-                            with open(log_path, 'r', encoding='utf-8') as f:
-                                lines = f.readlines()[-50:]
-                            for line in lines:
-                                if "ModuleNotFoundError" in line or "ImportError" in line:
-                                    missing_mod = line.strip()
-                                    break
-                        except Exception:
-                            pass
-
-                    if missing_mod:
-                        self.send_json_response({
-                            "error": "engine_crashed",
-                            "message": f"Engine crashed. {missing_mod}",
-                            "missing_module": missing_mod,
-                            "repair_available": True
-                        }, 500)
+                    crash_info = self._parse_crash_log(log_path)
+                    if crash_info:
+                        self.send_json_response(crash_info, 500)
                         return
             self.send_json_response({"error": err_msg}, 500)
 
@@ -120,13 +156,10 @@ class ProxyHandlersMixin:
         from urllib.parse import urlparse
         parsed = urlparse(self.path)
         qs = parsed.query
-        url = f"http://127.0.0.1:8188/view?{qs}"
+        url = f"{self._comfy_base_url()}/view?{qs}"
 
         try:
-            req = urllib.request.Request(url, headers={
-                'Origin': 'http://127.0.0.1:8188',
-                'Host': '127.0.0.1:8188',
-            })
+            req = urllib.request.Request(url, headers=self._comfy_headers())
             with urllib.request.urlopen(req, timeout=10) as res:
                 img_data = res.read()
 
@@ -144,12 +177,10 @@ class ProxyHandlersMixin:
             length = int(self.headers['Content-Length'])
             body = self.rfile.read(length)
 
-            url = "http://127.0.0.1:8188/upload/image"
-            req = urllib.request.Request(url, data=body, headers={
-                'Content-Type': self.headers['Content-Type'],
-                'Origin': 'http://127.0.0.1:8188',
-                'Host': '127.0.0.1:8188',
-            })
+            url = f"{self._comfy_base_url()}/upload/image"
+            hdrs = self._comfy_headers()
+            hdrs['Content-Type'] = self.headers['Content-Type']
+            req = urllib.request.Request(url, data=body, headers=hdrs)
             with urllib.request.urlopen(req, timeout=30) as res:
                 self.send_json_response(json.loads(res.read().decode('utf-8')))
         except Exception as e:
@@ -167,13 +198,10 @@ class ProxyHandlersMixin:
             body += img_bytes
             body += b"\r\n--" + boundary + b"--\r\n"
 
-            url = "http://127.0.0.1:8188/upload/image"
-            headers = {
-                "Content-Type": f"multipart/form-data; boundary={boundary.decode()}",
-                'Origin': 'http://127.0.0.1:8188',
-                'Host': '127.0.0.1:8188',
-            }
-            req = urllib.request.Request(url, data=body, headers=headers)
+            url = f"{self._comfy_base_url()}/upload/image"
+            hdrs = self._comfy_headers()
+            hdrs["Content-Type"] = f"multipart/form-data; boundary={boundary.decode()}"
+            req = urllib.request.Request(url, data=body, headers=hdrs)
             with urllib.request.urlopen(req, timeout=30) as res:
                 result = json.loads(res.read().decode('utf-8'))
                 return result.get("name", filename)
@@ -222,34 +250,17 @@ class ProxyHandlersMixin:
                 self.send_json_response(json.loads(content))
         except Exception as e:
             err_msg = str(e)
-            # Crash detection: check if engine process died (parity with ComfyUI proxy)
+            # Crash detection: check if engine process died (shared crash parser)
             if "Connection refused" in err_msg or "WinError 10061" in err_msg or "RemoteDisconnected" in err_msg:
                 # Map engine_name to package_id used by ProcessRegistry
                 pkg_id = "auto1111" if engine_name == "a1111" else engine_name
                 entry = AIWebServer.running_processes.get(pkg_id)
                 p = entry.get("process") if entry else None
                 if p and p.poll() is not None:
-                    # Process died — parse runtime.log for missing module errors
                     log_path = os.path.join(self.root_dir, "packages", pkg_id, "runtime.log")
-                    missing_mod = None
-                    if os.path.exists(log_path):
-                        try:
-                            with open(log_path, 'r', encoding='utf-8') as f:
-                                lines = f.readlines()[-50:]
-                            for line in lines:
-                                if "ModuleNotFoundError" in line or "ImportError" in line:
-                                    missing_mod = line.strip()
-                                    break
-                        except Exception:
-                            pass
-
-                    if missing_mod:
-                        self.send_json_response({
-                            "error": "engine_crashed",
-                            "message": f"Engine crashed. {missing_mod}",
-                            "missing_module": missing_mod,
-                            "repair_available": True
-                        }, 500)
+                    crash_info = self._parse_crash_log(log_path)
+                    if crash_info:
+                        self.send_json_response(crash_info, 500)
                         return
             self.send_json_response({"error": err_msg}, 500)
 

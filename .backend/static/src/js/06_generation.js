@@ -1,3 +1,102 @@
+        /* ═══ IS-01/IS-05: Unified Generation Payload Builder ═══
+           Single source of truth for both executeInference() and getInferencePayload().
+           Returns a payload compatible with build_comfy_workflow() field names. */
+        function buildGenerationPayload() {
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            const modelType = document.getElementById('inf-model-type')?.value || 'sdxl';
+
+            const payload = {
+                engine: engine,
+                backend: engine,  // Alias for batch queue's _batch_worker
+                model_type: modelType,
+                prompt: document.getElementById('inf-prompt')?.value || '',
+                negative_prompt: document.getElementById('inf-negative')?.value || '',
+                seed: parseInt(document.getElementById('inf-seed')?.value || '-1'),
+                steps: parseInt(document.getElementById('inf-steps')?.value || '20'),
+                cfg_scale: parseFloat(document.getElementById('inf-cfg')?.value || '7'),
+                width: parseInt(document.getElementById('inf-width')?.value || '1024'),
+                height: parseInt(document.getElementById('inf-height')?.value || '1024'),
+                sampler_name: document.getElementById('inf-sampler')?.value || 'euler',
+                scheduler: document.getElementById('inf-scheduler')?.value || 'normal',
+                override_settings: {
+                    sd_model_checkpoint: document.getElementById('inf-model')?.value || ''
+                },
+                vae: document.getElementById('inf-vae')?.value || 'none',
+                refiner: document.getElementById('inf-refiner')?.value || 'none',
+                refiner_steps: parseInt(document.getElementById('inf-refiner-steps')?.value || '10')
+            };
+
+            // FLUX parameters
+            if (modelType.includes('flux')) {
+                payload.flux_unet = document.getElementById('inf-flux-unet')?.value || '';
+                payload.flux_clip_l = document.getElementById('inf-flux-clip-l')?.value || '';
+                payload.flux_t5xxl = document.getElementById('inf-flux-t5xxl')?.value || '';
+                payload.flux_guidance = parseFloat(document.getElementById('inf-flux-guidance')?.value || '3.5');
+            }
+
+            // LoRAs
+            payload.loras = [];
+            document.querySelectorAll('#inf-lora-container > div').forEach(row => {
+                const sel = row.querySelector('.lora-select');
+                const wgt = row.querySelector('.lora-weight');
+                if (sel && wgt && sel.value && sel.value !== 'none') {
+                    payload.loras.push({ name: sel.value, weight: parseFloat(wgt.value) });
+                }
+            });
+
+            // Img2Img
+            if (window.comfyUploadedImg2Img) {
+                payload.init_image_name = window.comfyUploadedImg2Img;
+                payload.init_image_b64 = window.comfyUploadedImg2ImgB64;
+                payload.denoising_strength = parseFloat(document.getElementById('inf-img2img-denoise')?.value || '0.75');
+            }
+
+            // Hires Fix
+            const doHires = document.getElementById('inf-hires-enable')?.checked;
+            if (doHires && !payload.init_image_name) {
+                payload.hires = {
+                    enable: true,
+                    factor: parseFloat(document.getElementById('inf-hires-factor')?.value || '1.5'),
+                    denoise: parseFloat(document.getElementById('inf-hires-denoise')?.value || '0.4'),
+                    steps: parseInt(document.getElementById('inf-hires-steps')?.value || '10'),
+                    upscaler: document.getElementById('inf-hires-upscaler')?.value || 'latent'
+                };
+            }
+
+            // ControlNet
+            const cnEnable = document.getElementById('inf-cn-enable')?.checked;
+            if (cnEnable && window.comfyUploadedCn) {
+                payload.controlnet = {
+                    enable: true,
+                    model: document.getElementById('inf-cn-model')?.value || '',
+                    strength: parseFloat(document.getElementById('inf-cn-strength')?.value || '1.0'),
+                    image: window.comfyUploadedCn,
+                    image_b64: window.comfyUploadedCnB64
+                };
+            }
+
+            // IS-01: Inpainting mask (was missing from executeInference)
+            if (typeof hasInpaintMask === 'function' && hasInpaintMask()) {
+                payload.mask_b64 = getInpaintMaskBase64();
+                const canvasImg = document.getElementById('inf-canvas-img');
+                if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none' && !payload.init_image_b64) {
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width = canvasImg.naturalWidth;
+                    tmpCanvas.height = canvasImg.naturalHeight;
+                    tmpCanvas.getContext('2d').drawImage(canvasImg, 0, 0);
+                    payload.init_image_b64 = tmpCanvas.toDataURL('image/png').split(',')[1];
+                }
+            }
+
+            // IS-01: Regional prompting (was missing from executeInference)
+            if (typeof getRegionData === 'function') {
+                const regionData = getRegionData();
+                if (regionData) payload.regions = regionData;
+            }
+
+            return payload;
+        }
+
         async function initInferenceUI() {
             // Check selected engine server status
             const engine = document.getElementById('inf-engine')?.value || 'comfyui';
@@ -17,7 +116,7 @@
                 if(!res.ok) throw new Error("Offline");
                 document.getElementById('inf-launch-btn').innerText = "Backend Connected 🟢";
                 document.getElementById('inf-launch-btn').style.color = "#4ade80";
-                window.comfyLaunching = false;
+                window.engineLaunching = false;
             } catch(e) {
                 document.getElementById('inf-launch-btn').innerText = "Launch Engine";
                 document.getElementById('inf-launch-btn').style.color = "#cbd5e1";
@@ -25,7 +124,7 @@
                 // I-3 fix: Persistent guard prevents re-launch on tab switching.
                 // _engineAutoLaunched tracks per-engine so switching engines still auto-launches the new one.
                 if(!window._engineAutoLaunched) window._engineAutoLaunched = {};
-                if(!window.comfyLaunching && !window._engineAutoLaunched[engine]) {
+                if(!window.engineLaunching && !window._engineAutoLaunched[engine]) {
                     window._engineAutoLaunched[engine] = true;
                     launchActiveEngine();
                 }
@@ -271,10 +370,27 @@
                 btn.innerText = "Starting...";
                 btn.style.color = "#fbbf24";
                 
-                await fetch('/api/launch', {
+                // S-1: Check launch response for port conflicts / errors before polling
+                const launchRes = await fetch('/api/launch', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({package_id: appId}) // Package Manager expects package_id
+                    body: JSON.stringify({package_id: appId})
                 });
+                const launchData = await launchRes.json().catch(() => ({}));
+
+                if (!launchRes.ok || launchData.status === 'error') {
+                    const msg = launchData.message || 'Failed to launch engine';
+                    btn.innerText = launchData.port_conflict ? '\u26a0\ufe0f Port Conflict' : '\u274c Launch Failed';
+                    btn.style.color = '#ef4444';
+                    btn.onclick = launchActiveEngine;
+                    window.engineLaunching = false;
+                    showToast(`\ud83d\udeab ${msg}`);
+                    return;
+                }
+
+                // S-6: Store port for WebSocket connection
+                if (launchData.port && engine === 'comfyui') {
+                    window._comfyPort = launchData.port;
+                }
                 
                 let retries = 0;
                 const proxyMap = {
@@ -299,22 +415,39 @@
                         }
 
                         const data = await res.json().catch(()=>({}));
-                        if(data.error === "engine_crashed" && data.repair_available) {
+                        if(data.error === "engine_crashed") {
                             clearInterval(poll);
-                            btn.innerHTML = `Repair 🛠️ <span style="font-size:0.6rem">(${data.missing_module || 'Error'})</span>`;
-                            btn.style.color = "#ef4444";
-                            btn.onclick = async () => {
-                                btn.innerText = "Repairing...";
-                                btn.style.color = "#fbbf24";
-                                btn.onclick = launchActiveEngine;
-                                await fetch('/api/repair_dependency', {
-                                    method: 'POST', 
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({package_id: appId})
-                                });
-                                setTimeout(() => { window.engineLaunching = false; launchActiveEngine(); }, 3000);
-                            };
                             window.engineLaunching = false;
+
+                            // S-2: Handle expanded crash types from BUG-4
+                            if (data.repair_available) {
+                                // Missing module — offer repair button
+                                btn.innerHTML = `Repair 🛠️ <span style="font-size:0.6rem">(${data.detail || 'Missing dependency'})</span>`;
+                                btn.style.color = "#ef4444";
+                                btn.onclick = async () => {
+                                    btn.innerText = "Repairing...";
+                                    btn.style.color = "#fbbf24";
+                                    btn.onclick = launchActiveEngine;
+                                    await fetch('/api/repair_dependency', {
+                                        method: 'POST', 
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({package_id: appId})
+                                    });
+                                    setTimeout(() => { window.engineLaunching = false; launchActiveEngine(); }, 3000);
+                                };
+                            } else {
+                                // Non-repairable crash (CUDA OOM, port-in-use, etc.)
+                                const errorLabel = {
+                                    cuda_oom: '💥 GPU Out of Memory',
+                                    cuda_error: '💥 CUDA Error',
+                                    port_in_use: '⚠️ Port Conflict',
+                                    permission_error: '🔒 Permission Denied'
+                                }[data.error_type] || '❌ Engine Crashed';
+                                btn.innerText = `${errorLabel} — Click to Retry`;
+                                btn.style.color = '#ef4444';
+                                btn.onclick = launchActiveEngine;
+                                showToast(`${errorLabel}: ${data.message || 'Check engine logs.'}`);
+                            }
                             return;
                         }
                         
@@ -342,8 +475,55 @@
             }
         }
 
+        /* IS-11: Active generation AbortController for cancel support */
+        window._activeGenController = null;
+
+        async function cancelInference() {
+            // IS-11: Cancel in-flight generation + send ComfyUI /interrupt
+            if (window._activeGenController) {
+                window._activeGenController.abort();
+                window._activeGenController = null;
+            }
+            // Clear all ComfyUI polling intervals
+            if (window.comfyPollInterval) { clearInterval(window.comfyPollInterval); window.comfyPollInterval = null; }
+            if (window.comfyProgressInterval) { clearInterval(window.comfyProgressInterval); window.comfyProgressInterval = null; }
+
+            // Send /interrupt to ComfyUI to stop GPU work
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            if (engine === 'comfyui') {
+                try {
+                    await fetch('/api/comfy_proxy', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({endpoint: '/interrupt', payload: {}})
+                    });
+                } catch(e) { console.debug('[Cancel] ComfyUI interrupt failed:', e); }
+            }
+
+            // Reset UI
+            const btn = document.getElementById('inf-generate-btn');
+            const txt = document.getElementById('inf-generate-text');
+            const fill = document.getElementById('inf-progress-fill');
+            if (btn) btn.disabled = false;
+            if (txt) txt.innerText = 'Generate Image';
+            if (fill) { fill.style.width = '0%'; fill.classList.remove('progress-pulsing'); }
+            // Hide cancel, show generate
+            const cancelBtn = document.getElementById('inf-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (btn) btn.style.display = '';
+            // Hide progress bar
+            const bar = document.getElementById('gen-progress-bar');
+            const info = document.getElementById('gen-progress-info');
+            if (bar) bar.classList.remove('active');
+            if (info) { info.classList.remove('active'); info.textContent = ''; }
+            document.getElementById('inf-canvas-empty').innerText = 'Generation cancelled.';
+            showToast('🛑 Generation cancelled.');
+        }
+
         async function executeInference() {
-            const engine = document.getElementById('inf-engine').value;
+            // IS-01/IS-05: Use unified payload builder
+            const payload = buildGenerationPayload();
+            const engine = payload.engine;
             let endpoint = engine === 'comfyui' ? '/api/comfy_proxy' : `/api/${engine}_proxy`;
             
             const btn = document.getElementById('inf-generate-btn');
@@ -352,86 +532,21 @@
             
             // R-12: Prompt length validation — prevent engine timeouts from extreme inputs
             const _PROMPT_MAX = 10000;
-            const promptVal = document.getElementById('inf-prompt').value;
-            const negVal = document.getElementById('inf-negative').value;
-            if(promptVal.length > _PROMPT_MAX || negVal.length > _PROMPT_MAX) {
+            if(payload.prompt.length > _PROMPT_MAX || payload.negative_prompt.length > _PROMPT_MAX) {
                 showToast(`⚠️ Prompt exceeds ${_PROMPT_MAX} character limit. Please shorten it.`);
                 return;
             }
-            
-            // Build Universal Payload
-            const payload = {
-                engine: engine,
-                model_type: document.getElementById('inf-model-type').value,
-                prompt: document.getElementById('inf-prompt').value,
-                negative_prompt: document.getElementById('inf-negative').value,
-                seed: parseInt(document.getElementById('inf-seed').value),
-                steps: parseInt(document.getElementById('inf-steps').value),
-                cfg_scale: parseFloat(document.getElementById('inf-cfg').value),
-                width: parseInt(document.getElementById('inf-width').value),
-                height: parseInt(document.getElementById('inf-height').value),
-                sampler_name: document.getElementById('inf-sampler').value,
-                scheduler: document.getElementById('inf-scheduler').value,
-                override_settings: {
-                    sd_model_checkpoint: document.getElementById('inf-model').value
-                },
-                vae: document.getElementById('inf-vae').value,
-                refiner: document.getElementById('inf-refiner').value,
-                refiner_steps: parseInt(document.getElementById('inf-refiner-steps').value)
-            };
 
-            // Flux specific parameters
-            if(payload.model_type.includes('flux')) {
-                payload.flux_unet = document.getElementById('inf-flux-unet')?.value;
-                payload.flux_clip_l = document.getElementById('inf-flux-clip-l')?.value;
-                payload.flux_t5xxl = document.getElementById('inf-flux-t5xxl')?.value;
-                payload.flux_guidance = parseFloat(document.getElementById('inf-flux-guidance')?.value || 3.5);
-            }
-
-            // LoRAs
-            payload.loras = [];
-            document.querySelectorAll('#inf-lora-container > div').forEach(row => {
-                const lName = row.querySelector('.lora-select').value;
-                const lWeight = parseFloat(row.querySelector('.lora-weight').value);
-                if(lName && lName !== 'none') {
-                    payload.loras.push({ name: lName, weight: lWeight });
-                }
-            });
-
-            // Img2Img
-            if(window.comfyUploadedImg2Img) {
-                payload.init_image_name = window.comfyUploadedImg2Img;
-                payload.init_image_b64 = window.comfyUploadedImg2ImgB64;
-                payload.denoising_strength = parseFloat(document.getElementById('inf-img2img-denoise').value);
-            }
-
-            // Hires Fix
-            const doHires = document.getElementById('inf-hires-enable').checked;
-            if(doHires && !payload.init_image_name) {
-                payload.hires = {
-                    enable: true,
-                    factor: parseFloat(document.getElementById('inf-hires-factor').value),
-                    denoise: parseFloat(document.getElementById('inf-hires-denoise').value),
-                    steps: parseInt(document.getElementById('inf-hires-steps').value),
-                    upscaler: document.getElementById('inf-hires-upscaler').value
-                };
-            }
-
-            // ControlNet
-            const cnEnable = document.getElementById('inf-cn-enable')?.checked;
-            if(cnEnable && window.comfyUploadedCn) {
-                payload.controlnet = {
-                    enable: true,
-                    model: document.getElementById('inf-cn-model').value,
-                    strength: parseFloat(document.getElementById('inf-cn-strength').value),
-                    image: window.comfyUploadedCn,
-                    image_b64: window.comfyUploadedCnB64
-                };
-            }
+            // IS-11: Create AbortController for cancel support
+            const controller = new AbortController();
+            window._activeGenController = controller;
             
             fill.style.width = '0%';
             btn.disabled = true;
             txt.innerText = "Queueing...";
+            // IS-11: Show cancel button
+            const cancelBtn = document.getElementById('inf-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'inline-flex';
             document.getElementById('inf-canvas-img').style.display = 'none';
             document.getElementById('inf-canvas-empty').style.display = 'block';
             document.getElementById('inf-canvas-empty').innerText = "Waking Engine...";
@@ -483,7 +598,7 @@
                                 document.getElementById('inf-canvas-empty').style.display = 'none';
                             }
                         }
-                    } catch(e) {}
+                    } catch(e) { console.debug('[Progress] A1111/Forge poll error:', e); }
                 }, 1000);
             } else if (engine === 'fooocus') {
                 fill.style.width = '5%';
@@ -500,7 +615,8 @@
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({endpoint: '/api/generate', payload: payload})
+                    body: JSON.stringify({endpoint: '/api/generate', payload: payload}),
+                    signal: controller.signal  // IS-11: AbortController support
                 });
                 const data = await res.json();
                 
@@ -520,53 +636,73 @@
                     document.getElementById('inf-canvas-empty').innerText = "Generating your image...";
                     
                     // R-4: Dynamic WebSocket URL for LAN sharing support
-                    if(!window.comfyWS && activeEngine === 'comfyui') {
-                        try {
-                            const wsHost = window.location.hostname || '127.0.0.1';
-                            const wsPort = window._comfyPort || 8188;
-                            window.comfyWS = new WebSocket(`ws://${wsHost}:${wsPort}/ws`);
-                            window.comfyWS.onmessage = (event) => {
-                                if(typeof event.data === 'string') {
-                                    const msg = JSON.parse(event.data);
-                                    if(msg.type === 'progress') {
-                                        const pfill = document.getElementById('inf-progress-fill');
-                                        if(pfill && msg.data.max > 0) {
-                                            const pct = (msg.data.value / msg.data.max) * 100;
-                                            pfill.style.width = pct + '%';
-                                            pfill.classList.remove('progress-pulsing');
-                                            updateGenProgress(pct, `Step ${msg.data.value}/${msg.data.max}`);
-                                        }
-                                    }
-                                } else {
-                                    const reader = new FileReader();
-                                    reader.onload = () => {
-                                        const buffer = new Uint8Array(reader.result);
-                                        if(buffer.length > 8) {
-                                            const imgBlob = new Blob([buffer.slice(8)]);
-                                            const imgUrl = URL.createObjectURL(imgBlob);
-                                            const cimg = document.getElementById('inf-canvas-img');
-                                            if(cimg) {
-                                                cimg.src = imgUrl;
-                                                cimg.style.display = 'block';
-                                                document.getElementById('inf-canvas-empty').style.display = 'none';
+                    // IS-02 fix: was `activeEngine` (undefined) — now uses local `engine` variable
+                    // IS-12 fix: Read ComfyUI port from server status if available
+                    if(!window.comfyWS && engine === 'comfyui') {
+                        // S-3: WebSocket connection with auto-reconnect backoff
+                        function connectComfyWS(attempt) {
+                            if (attempt > 3) { console.warn('[ComfyUI WS] Max reconnect attempts reached.'); return; }
+                            try {
+                                const wsHost = window.location.hostname || '127.0.0.1';
+                                const wsPort = window._comfyPort || 8188;
+                                const ws = new WebSocket(`ws://${wsHost}:${wsPort}/ws`);
+                                ws.onopen = () => { console.log('[ComfyUI WS] Connected (attempt ' + attempt + ')'); };
+                                ws.onmessage = (event) => {
+                                    if(typeof event.data === 'string') {
+                                        try {
+                                            const msg = JSON.parse(event.data);
+                                            if(msg.type === 'progress') {
+                                                const pfill = document.getElementById('inf-progress-fill');
+                                                if(pfill && msg.data.max > 0) {
+                                                    const pct = (msg.data.value / msg.data.max) * 100;
+                                                    pfill.style.width = pct + '%';
+                                                    pfill.classList.remove('progress-pulsing');
+                                                    updateGenProgress(pct, `Step ${msg.data.value}/${msg.data.max}`);
+                                                }
                                             }
-                                        }
-                                    };
-                                    reader.readAsArrayBuffer(event.data);
-                                }
-                            };
-                            // R-2: Auto-reconnect on disconnect by nulling the reference
-                            window.comfyWS.onclose = () => {
-                                console.log('[ComfyUI WS] Connection closed. Will reconnect on next generation.');
-                                window.comfyWS = null;
-                            };
-                            window.comfyWS.onerror = (err) => {
-                                console.warn('[ComfyUI WS] Error:', err);
-                                window.comfyWS = null;
-                            };
-                        } catch(e) {
-                            console.warn('[ComfyUI WS] Failed to connect:', e);
+                                        } catch(parseErr) { console.debug('[ComfyUI WS] Parse error:', parseErr); }
+                                    } else {
+                                        const reader = new FileReader();
+                                        reader.onload = () => {
+                                            const buffer = new Uint8Array(reader.result);
+                                            if(buffer.length > 8) {
+                                                const imgBlob = new Blob([buffer.slice(8)]);
+                                                const imgUrl = URL.createObjectURL(imgBlob);
+                                                const cimg = document.getElementById('inf-canvas-img');
+                                                if(cimg) {
+                                                    // IS-04: Revoke previous blob URL to prevent memory leak
+                                                    if (cimg._lastBlobUrl) URL.revokeObjectURL(cimg._lastBlobUrl);
+                                                    cimg._lastBlobUrl = imgUrl;
+                                                    cimg.src = imgUrl;
+                                                    cimg.style.display = 'block';
+                                                    document.getElementById('inf-canvas-empty').style.display = 'none';
+                                                }
+                                            }
+                                        };
+                                        reader.readAsArrayBuffer(event.data);
+                                    }
+                                };
+                                // S-3: Auto-reconnect with exponential backoff during active generation
+                                ws.onclose = () => {
+                                    console.log('[ComfyUI WS] Connection closed.');
+                                    window.comfyWS = null;
+                                    // Only reconnect if generation is still in-flight
+                                    if (window.comfyPollInterval) {
+                                        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+                                        console.log(`[ComfyUI WS] Reconnecting in ${delay}ms (attempt ${attempt + 1})...`);
+                                        setTimeout(() => connectComfyWS(attempt + 1), delay);
+                                    }
+                                };
+                                ws.onerror = (err) => {
+                                    console.warn('[ComfyUI WS] Error:', err);
+                                    // onclose will fire after onerror — reconnect happens there
+                                };
+                                window.comfyWS = ws;
+                            } catch(e) {
+                                console.warn('[ComfyUI WS] Failed to connect:', e);
+                            }
                         }
+                        connectComfyWS(1);
                     }
                     
                     window.comfyProgressInterval = setInterval(() => {
@@ -622,12 +758,15 @@
                                         fill.style.width = '100%';
                                         fill.classList.remove('progress-pulsing');
                                         hideGenProgress();
+                                        // IS-11: Hide cancel button on completion
+                                        if (cancelBtn) cancelBtn.style.display = 'none';
+                                        window._activeGenController = null;
                                         setTimeout(() => fill.style.width = '0%', 800);
                                         break;
                                     }
                                 }
                             }
-                        } catch(e) {}
+                        } catch(e) { console.debug('[ComfyUI] History poll error:', e); }
                     }, 1500);
 
                 } else if(engine === 'a1111' || engine === 'forge') {
@@ -644,6 +783,8 @@
                     fill.style.width = '0%';
                     fill.classList.remove('progress-pulsing');
                     hideGenProgress();
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    window._activeGenController = null;
                 } else if(engine === 'fooocus') {
                     if(data.image) {
                         const canvasImg = document.getElementById('inf-canvas-img');
@@ -657,8 +798,11 @@
                     fill.style.width = '0%';
                     fill.classList.remove('progress-pulsing');
                     hideGenProgress();
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    window._activeGenController = null;
                 }
             } catch(e) {
+                if (e.name === 'AbortError') return;  // IS-11: User cancelled — cancelInference already cleaned up
                 if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
                 alert("Generation Failed: " + e.message + `\n\nIs ${engine} running?`);
                 btn.disabled = false;
@@ -668,6 +812,8 @@
                 hideGenProgress();
                 if(window.comfyPollInterval) clearInterval(window.comfyPollInterval);
                 if(window.comfyProgressInterval) clearInterval(window.comfyProgressInterval);
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                window._activeGenController = null;
                 document.getElementById('inf-canvas-empty').innerText = "No Output";
             }
         }
@@ -709,7 +855,7 @@
                         </div>
                     `;
                 });
-            } catch(e) { }
+            } catch(e) { console.debug('[Downloads] Poll error:', e); }
         }
         
         async function checkSystemStatus() {

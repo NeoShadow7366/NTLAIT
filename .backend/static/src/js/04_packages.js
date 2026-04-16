@@ -182,64 +182,75 @@
                     body: JSON.stringify({package_id: packageId})
                 });
                 const response = await res.json();
-                if(response.status === 'success') {
-                    if(response.already_running && response.url) {
-                        window.open(response.url, '_blank');
-                        loadPackages();
-                        return;
-                    }
-                    // Show warm-up status on the card
-                    const statusEl = document.getElementById(`pkg-status-${packageId}`);
-                    if(statusEl) {
-                        statusEl.style.display = 'block';
-                        statusEl.innerHTML = '<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Initializing engine...';
-                    }
-                    btn.innerText = "Starting...";
-                    // Connectivity poll: wait for the engine to actually respond
-                    if(response.url) {
-                        let attempts = 0;
-                        const maxAttempts = 60; // 60 × 2s = 2 minutes max
-                        const pollId = setInterval(async () => {
-                            attempts++;
-                            if(statusEl) statusEl.innerHTML = `<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Warming up engine... (${attempts}s)`;
-                            try {
-                                // P-2 fix: Use backend probe instead of fragile no-cors fetch
-                                const probe = await fetch('/api/probe_url', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({url: response.url}),
-                                    signal: AbortSignal.timeout(3000)
-                                });
-                                const probeData = await probe.json();
-                                if (probeData.reachable) {
-                                    clearInterval(pollId);
-                                    if(statusEl) { statusEl.innerHTML = '✅ Engine ready!'; setTimeout(() => { statusEl.style.display = 'none'; }, 2000); }
-                                    window.open(response.url, '_blank');
-                                    loadPackages();
-                                }
-                            } catch(_) {
-                                if(attempts >= maxAttempts) {
-                                    clearInterval(pollId);
-                                    if(statusEl) { statusEl.innerHTML = '⚠️ Engine may still be loading. <a href="' + response.url + '" target="_blank" style="color:#a78bfa;">Open manually →</a>'; }
-                                    loadPackages();
-                                }
-                            }
-                        }, 2000);
-                    }
-                    loadPackages();
-                } else {
-                    // Check if server says we need a repair
-                    if(response.needs_repair) {
-                        const statusEl = document.getElementById(`pkg-status-${packageId}`);
-                        if(statusEl) {
-                            statusEl.style.display = 'block';
-                            statusEl.innerHTML = '⚠️ Source code missing. <a href="#" onclick="repairPackage(\'' + packageId + '\'); return false;" style="color:#f59e0b; text-decoration:underline;">Click here to repair</a>';
-                        }
-                        btn.innerText = 'Launch UI'; btn.disabled = false;
-                    } else {
-                        alert(response.message); btn.innerText = 'Launch UI'; btn.disabled = false;
-                    }
+
+                // S-6: Store port for WebSocket connection
+                if (response.port && packageId === 'comfyui') {
+                    window._comfyPort = response.port;
                 }
+
+                // S-7: Handle port conflict (409) and other non-success responses
+                if (!res.ok || response.status === 'error') {
+                    const statusEl = document.getElementById(`pkg-status-${packageId}`);
+                    if (statusEl) {
+                        statusEl.style.display = 'block';
+                        if (response.port_conflict) {
+                            statusEl.innerHTML = `⚠️ Port ${response.port || ''} is already in use. Stop the other process first or change the port in the recipe.`;
+                        } else if (response.needs_repair) {
+                            statusEl.innerHTML = '⚠️ Source code missing. <a href="#" onclick="repairPackage(\'' + packageId + '\'); return false;" style="color:#f59e0b; text-decoration:underline;">Click here to repair</a>';
+                        } else {
+                            statusEl.innerHTML = '❌ ' + (response.message || 'Launch failed');
+                        }
+                    } else {
+                        showToast(`🚫 ${response.message || 'Launch failed'}`);
+                    }
+                    btn.innerText = 'Launch UI'; btn.disabled = false;
+                    return;
+                }
+
+                if(response.already_running && response.url) {
+                    window.open(response.url, '_blank');
+                    loadPackages();
+                    return;
+                }
+                // Show warm-up status on the card
+                const statusEl = document.getElementById(`pkg-status-${packageId}`);
+                if(statusEl) {
+                    statusEl.style.display = 'block';
+                    statusEl.innerHTML = '<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Initializing engine...';
+                }
+                btn.innerText = "Starting...";
+                // Connectivity poll: wait for the engine to actually respond
+                if(response.url) {
+                    let attempts = 0;
+                    const maxAttempts = 60; // 60 × 2s = 2 minutes max
+                    const pollId = setInterval(async () => {
+                        attempts++;
+                        if(statusEl) statusEl.innerHTML = `<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Warming up engine... (${attempts}s)`;
+                        try {
+                            // P-2 fix: Use backend probe instead of fragile no-cors fetch
+                            const probe = await fetch('/api/probe_url', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({url: response.url}),
+                                signal: AbortSignal.timeout(3000)
+                            });
+                            const probeData = await probe.json();
+                            if (probeData.reachable) {
+                                clearInterval(pollId);
+                                if(statusEl) { statusEl.innerHTML = '✅ Engine ready!'; setTimeout(() => { statusEl.style.display = 'none'; }, 2000); }
+                                window.open(response.url, '_blank');
+                                loadPackages();
+                            }
+                        } catch(_) {
+                            if(attempts >= maxAttempts) {
+                                clearInterval(pollId);
+                                if(statusEl) { statusEl.innerHTML = '⚠️ Engine may still be loading. <a href="' + response.url + '" target="_blank" style="color:#a78bfa;">Open manually →</a>'; }
+                                loadPackages();
+                            }
+                        }
+                    }, 2000);
+                }
+                loadPackages();
             } catch(e) { alert("Failed to contact server"); btn.innerText = 'Launch UI'; btn.disabled = false; }
         }
 

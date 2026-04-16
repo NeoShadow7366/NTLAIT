@@ -85,6 +85,11 @@
         }
         
         async function uploadFileToProxy(file) {
+            // BUG-6 fix: Only ComfyUI requires server-side file upload.
+            // A1111/Forge use base64 inline in the payload — skip upload to avoid errors.
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            if (engine !== 'comfyui') return null;
+
             document.getElementById('inf-generate-btn').disabled = true;
             document.getElementById('inf-generate-text').innerText = "Uploading Image to Engine...";
             
@@ -97,7 +102,7 @@
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return data.name; 
             } catch(e) {
-                alert("Engine upload failed! Is it running?");
+                alert("Engine upload failed! Is ComfyUI running?");
                 document.getElementById('inf-generate-btn').disabled = false;
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return null;
@@ -141,7 +146,6 @@
             btn.style.color = '#cbd5e1';
             btn.onclick = launchActiveEngine;
             window.engineLaunching = false;
-            window.comfyLaunching = false;
             // I-11 fix: Clear stale ComfyUI img2img reference when switching engines
             window.comfyUploadedImg2Img = null;
             
@@ -467,19 +471,8 @@
             }
         }
 
-        function restoreMetadataFromDrop(e) {
-            const file = e.dataTransfer.files[0];
-            if(!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const img = document.getElementById('inf-canvas-img');
-                img.src = evt.target.result;
-                img.style.display = 'block';
-                document.getElementById('inf-canvas-empty').style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        }
+        // IS-09: restoreMetadataFromDrop is defined in 05_inference.js
+        // with full ComfyUI metadata extraction. No duplicate needed here.
 
         function repopulateUI(metadata) {
             if(!metadata) return;
@@ -570,6 +563,9 @@
             document.getElementById('view-packages').style.display = 'none';
             document.getElementById('view-settings').style.display = 'none';
             
+            // IS-13: Stop Ollama polling when leaving Inference tab
+            if (tabId !== 'inference' && typeof stopOllamaPolling === 'function') stopOllamaPolling();
+            
             if(tabId === 'dashboard') {
                 document.getElementById('view-dashboard').style.display = 'block';
                 document.getElementById('page-title').innerText = 'Dashboard';
@@ -585,6 +581,8 @@
                 document.getElementById('page-title').innerText = 'Inference Studio';
                 document.getElementById('page-subtitle').innerText = 'Generate artwork identically to Stability Matrix natively driven by ComfyUI.';
                 initInferenceUI();
+                // IS-13: Start Ollama polling only when Inference tab is active
+                if (typeof startOllamaPolling === 'function') startOllamaPolling();
             } else if(tabId === 'vault') {
                 document.getElementById('view-vault').style.display = 'block';
                 document.getElementById('page-title').innerText = 'Global Vault';

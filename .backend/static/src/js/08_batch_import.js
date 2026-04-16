@@ -4,41 +4,10 @@
         let _batchPollInterval = null;
 
         function getInferencePayload() {
-            // Gather current inference parameters into a payload object
-            const payload = {
-                prompt: resolveWildcards(document.getElementById('inf-prompt')?.value || ''),
-                negative: resolveWildcards(document.getElementById('inf-negative')?.value || ''),
-                steps: parseInt(document.getElementById('inf-steps')?.value || '20'),
-                cfg: parseFloat(document.getElementById('inf-cfg')?.value || '7'),
-                width: parseInt(document.getElementById('inf-width')?.value || '512'),
-                height: parseInt(document.getElementById('inf-height')?.value || '512'),
-                seed: parseInt(document.getElementById('inf-seed')?.value || '-1'),
-                sampler: document.getElementById('inf-sampler')?.value || 'euler',
-                scheduler: document.getElementById('inf-scheduler')?.value || 'normal',
-                backend: document.getElementById('inf-engine')?.value || 'comfyui'
-            };
-            // Model
-            const modelSel = document.getElementById('inf-model');
-            if(modelSel) payload.model = modelSel.value;
-            // Sprint 12: Include inpainting mask if active
-            if (hasInpaintMask()) {
-                payload.mask_b64 = getInpaintMaskBase64();
-                // Also include the current canvas image as init_image for inpainting
-                const canvasImg = document.getElementById('inf-canvas-img');
-                if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none') {
-                    // Convert displayed image to base64
-                    const tmpCanvas = document.createElement('canvas');
-                    tmpCanvas.width = canvasImg.naturalWidth;
-                    tmpCanvas.height = canvasImg.naturalHeight;
-                    tmpCanvas.getContext('2d').drawImage(canvasImg, 0, 0);
-                    payload.init_image_b64 = tmpCanvas.toDataURL('image/png').split(',')[1];
-                }
-            }
-            // Sprint 12: Include regional prompting data if active
-            const regionData = getRegionData();
-            if (regionData) {
-                payload.regions = regionData;
-            }
+            // IS-05: Delegate to unified payload builder, then apply wildcard resolution
+            const payload = buildGenerationPayload();
+            payload.prompt = resolveWildcards(payload.prompt);
+            payload.negative_prompt = resolveWildcards(payload.negative_prompt || '');
             return payload;
         }
 
@@ -118,6 +87,37 @@
                 showToast('🎨 Batch job completed');
             } else if (data.status === 'failed') {
                 showToast('❌ Batch job failed: ' + (data.error || 'Unknown error'));
+            }
+
+            // IS-06: Update XYZ/Seed Explorer grid cell if this job belongs to an active session
+            if (window._xyzJobIds && data.id) {
+                const idx = window._xyzJobIds.indexOf(data.id);
+                if (idx !== -1 && window._xyzGridEl) {
+                    const cell = window._xyzGridEl.querySelector(`[data-xyz-idx="${idx}"]`);
+                    if (cell) {
+                        if (data.status === 'done') {
+                            cell.style.background = 'rgba(16, 185, 129, 0.15)';
+                            cell.style.borderColor = '#10b981';
+                            const label = cell.querySelector('.xyz-grid-label');
+                            if (label) label.textContent = '✅ ' + label.textContent;
+                        } else if (data.status === 'failed') {
+                            cell.style.background = 'rgba(239, 68, 68, 0.15)';
+                            cell.style.borderColor = '#ef4444';
+                            const label = cell.querySelector('.xyz-grid-label');
+                            if (label) label.textContent = '❌ ' + label.textContent;
+                        }
+                    }
+                    // Check if all jobs are complete
+                    const completedCount = window._xyzJobIds.filter((_, i) => {
+                        const c = window._xyzGridEl.querySelector(`[data-xyz-idx="${i}"]`);
+                        return c && (c.style.borderColor === 'rgb(16, 185, 129)' || c.style.borderColor === 'rgb(239, 68, 68)');
+                    }).length;
+                    if (completedCount >= window._xyzJobIds.length) {
+                        const statusEl = document.getElementById('xyz-status');
+                        if (statusEl) statusEl.textContent = '✅ All XYZ/Seed jobs completed!';
+                        window._xyzJobIds = null;
+                    }
+                }
             }
         };
 

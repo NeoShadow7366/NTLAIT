@@ -9,11 +9,108 @@ import time
 import shutil
 import stat
 import tempfile
+import platform
 
 # Ensure we import the safe symlinking code
 from symlink_manager import create_safe_directory_link
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+
+# ── S-5: Platform-aware PyTorch Index URL Resolver ──────────────────
+# Recipes declare `cu121` as intent ("I need GPU-accelerated PyTorch").
+# At install time, this resolver detects the actual GPU and rewrites
+# the pip --index-url to match the user's hardware.
+
+def _detect_gpu_vendor() -> str:
+    """Detect GPU vendor at install time. Returns 'nvidia', 'amd', 'mps', or 'cpu'."""
+    system = platform.system()
+
+    # macOS: Apple Silicon uses MPS (Metal Performance Shaders) — no CUDA
+    if system == "Darwin":
+        try:
+            chip = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"],
+                                           timeout=5).decode().strip()
+            if "Apple" in chip:
+                return "mps"
+        except Exception:
+            pass
+        return "cpu"
+
+    # Windows/Linux: Check for NVIDIA GPU via nvidia-smi
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, timeout=5,
+            creationflags=0x08000000 if os.name == 'nt' else 0
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return "nvidia"
+    except (FileNotFoundError, Exception):
+        pass
+
+    # Check for AMD/ROCm GPU
+    if system == "Linux":
+        try:
+            result = subprocess.run(["rocminfo"], capture_output=True, timeout=5)
+            if result.returncode == 0 and b"gfx" in result.stdout:
+                return "amd"
+        except (FileNotFoundError, Exception):
+            pass
+
+    return "cpu"
+
+
+# Cache the detection result — GPU doesn't change during a session
+_gpu_vendor_cache: str | None = None
+
+
+def _get_gpu_vendor() -> str:
+    """Cached GPU vendor detection."""
+    global _gpu_vendor_cache
+    if _gpu_vendor_cache is None:
+        _gpu_vendor_cache = _detect_gpu_vendor()
+        logging.info(f"Detected GPU vendor: {_gpu_vendor_cache}")
+    return _gpu_vendor_cache
+
+
+# Map GPU vendor to PyTorch pip index URL
+_PYTORCH_INDEX_URLS = {
+    "nvidia": "https://download.pytorch.org/whl/cu121",
+    "amd":    "https://download.pytorch.org/whl/rocm6.2",
+    "cpu":    "https://download.pytorch.org/whl/cpu",
+    "mps":    None,  # macOS MPS uses default PyPI (no --index-url needed)
+}
+
+
+def resolve_pytorch_command(cmd: str) -> str:
+    """Rewrite a pip install torch command's --index-url based on detected GPU.
+
+    Input:  "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121"
+    Output: Same command with the index URL replaced for the current platform.
+            On macOS (MPS), --index-url is removed entirely (uses default PyPI).
+
+    Non-torch pip commands are returned unchanged.
+    """
+    # Only transform pip install commands that contain torch and an index URL
+    if not (cmd.startswith("pip ") and "torch" in cmd and "--index-url" in cmd):
+        return cmd
+
+    vendor = _get_gpu_vendor()
+    target_url = _PYTORCH_INDEX_URLS.get(vendor)
+
+    if target_url is None:
+        # macOS MPS: remove --index-url entirely — PyPI default has MPS support
+        cmd = re.sub(r'\s*--index-url\s+\S+', '', cmd)
+        logging.info(f"[PyTorch] macOS MPS detected — removed --index-url (using PyPI default)")
+    else:
+        # Replace the existing index URL with the platform-specific one
+        original = cmd
+        cmd = re.sub(r'--index-url\s+\S+', f'--index-url {target_url}', cmd)
+        if cmd != original:
+            logging.info(f"[PyTorch] Rewrote index URL for {vendor}: {target_url}")
+
+    return cmd
 
 
 # ── Extension Clone Progress Tracker ────────────────────────────────
@@ -562,6 +659,8 @@ class RecipeInstaller:
             if pip_commands:
                 logging.info("Executing isolated PIP commands...")
                 for i, cmd in enumerate(pip_commands):
+                    # S-5: Resolve platform-aware PyTorch index URL before execution
+                    cmd = resolve_pytorch_command(cmd)
                     # Intercept `pip install` to force `venv/python -m pip install`
                     if cmd.startswith("pip "):
                         parts = cmd.split(" ")[1:] 

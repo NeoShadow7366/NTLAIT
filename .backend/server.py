@@ -917,6 +917,7 @@ def start_background_scanners():
             logging.warning("event_bus not available, SSE emitter disabled")
             return
 
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _last_dl_mtime = 0.0
         _last_inst_mtime = 0.0
         _last_running_count = -1

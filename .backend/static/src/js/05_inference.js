@@ -51,6 +51,14 @@
             canvas.style.height = imgRect.height + 'px';
         }
 
+        // IS-07: Debounced window resize handler to keep inpaint canvas aligned
+        let _resizeDebounce = null;
+        window.addEventListener('resize', () => {
+            if (!window._inpaintActive) return;
+            clearTimeout(_resizeDebounce);
+            _resizeDebounce = setTimeout(resizeInpaintCanvas, 150);
+        });
+
         function setInpaintTool(tool) {
             window._inpaintTool = tool;
             document.getElementById('inpaint-brush-btn').classList.toggle('active-tool', tool === 'brush');
@@ -255,39 +263,30 @@
             document.getElementById('inf-width').value = newW;
             document.getElementById('inf-height').value = newH;
 
-            // Auto-create mask for the extended region
+            // IS-08: Use img.onload instead of fragile setTimeout
+            // Auto-create mask for the extended region after image loads
+            function _applyOutpaintMask() {
+                resizeInpaintCanvas();
+                const maskCanvas = document.getElementById('inpaint-canvas');
+                const mctx = maskCanvas.getContext('2d');
+                mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+                const scaleX = maskCanvas.width / newW;
+                const scaleY = maskCanvas.height / newH;
+
+                mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+                if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
+                if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
+                if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
+                if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
+            }
+
             if (window._inpaintActive) {
-                setTimeout(() => {
-                    resizeInpaintCanvas();
-                    const maskCanvas = document.getElementById('inpaint-canvas');
-                    const mctx = maskCanvas.getContext('2d');
-                    mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-
-                    // Scale to display coordinates
-                    const scaleX = maskCanvas.width / newW;
-                    const scaleY = maskCanvas.height / newH;
-
-                    mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-                    if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
-                    if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
-                }, 200);
+                img.onload = _applyOutpaintMask;
             } else {
                 // Auto-enable inpaint mode for outpainting
                 toggleInpaintMode();
-                setTimeout(() => {
-                    const maskCanvas = document.getElementById('inpaint-canvas');
-                    const mctx = maskCanvas.getContext('2d');
-                    const scaleX = maskCanvas.width / newW;
-                    const scaleY = maskCanvas.height / newH;
-
-                    mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-                    if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
-                    if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
-                }, 300);
+                img.onload = _applyOutpaintMask;
             }
         }
 
@@ -507,13 +506,16 @@
 
             // Queue all to batch
             let queued = 0;
+            const allJobIds = [];
             for (const combo of combos) {
                 try {
-                    await fetch('/api/generate/batch', {
+                    const res = await fetch('/api/generate/batch', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ payload: combo })
                     });
+                    const resData = await res.json();
+                    if (resData.job_ids) allJobIds.push(...resData.job_ids);
                     queued++;
                     statusEl.textContent = `Queued ${queued} / ${combos.length}...`;
                 } catch(e) {
@@ -521,13 +523,20 @@
                 }
             }
 
-            statusEl.textContent = `✅ ${queued} generations queued! Check Batch Queue for results.`;
+            statusEl.textContent = `✅ ${queued} generations queued!`;
             
-            // Show grid layout info
+            // IS-06: Track job IDs for SSE-driven result collection
+            window._xyzJobIds = allJobIds;
+            window._xyzCombos = combos;
+            window._xyzGridEl = gridEl;
+
+            // Show grid layout with placeholders
             gridEl.style.display = 'grid';
             gridEl.style.gridTemplateColumns = `repeat(${xList.length}, 1fr)`;
-            gridEl.innerHTML = combos.map(c => 
-                `<div class="xyz-grid-label">${c._xyz_label}</div>`
+            gridEl.innerHTML = combos.map((c, i) => 
+                `<div class="xyz-grid-cell" data-xyz-idx="${i}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,0.2); font-size:0.7rem; color:var(--text-muted); padding:4px; text-align:center; position:relative; overflow:hidden;">
+                    <span class="xyz-grid-label">${c._xyz_label}</span>
+                </div>`
             ).join('');
         }
 
@@ -537,10 +546,11 @@
         }
 
         function applyAxisValue(payload, param, value) {
+            // IS-05: Use unified payload field names (cfg_scale, sampler_name)
             switch(param) {
                 case 'steps': payload.steps = parseInt(value); break;
-                case 'cfg': payload.cfg = parseFloat(value); break;
-                case 'sampler': payload.sampler = value; break;
+                case 'cfg': payload.cfg_scale = parseFloat(value); break;
+                case 'sampler': payload.sampler_name = value; break;
                 case 'seed': payload.seed = parseInt(value); break;
                 case 'width': payload.width = parseInt(value); break;
                 case 'height': payload.height = parseInt(value); break;
@@ -571,23 +581,30 @@
             gridEl.innerHTML = '';
 
             let queued = 0;
+            const allJobIds = [];
             for (let i = 0; i < count; i++) {
                 const p = JSON.parse(JSON.stringify(basePayload));
                 p.seed = baseSeed + i;
                 try {
-                    await fetch('/api/generate/batch', {
+                    const res = await fetch('/api/generate/batch', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(p)
+                        body: JSON.stringify({ payload: p })
                     });
+                    const data = await res.json();
+                    if (data.job_ids) allJobIds.push(...data.job_ids);
                     queued++;
-                    gridEl.innerHTML += `<div class="xyz-grid-label">Seed: ${p.seed}</div>`;
+                    gridEl.innerHTML += `<div class="xyz-grid-cell" data-xyz-idx="${i}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,0.2); font-size:0.7rem; color:var(--text-muted); padding:4px; text-align:center;"><span class="xyz-grid-label">Seed: ${p.seed}</span></div>`;
                     statusEl.textContent = `Queued ${queued} / ${count}...`;
                 } catch(e) {
                     console.error('Seed explorer queue error:', e);
                 }
             }
             statusEl.textContent = `✅ ${queued} seed variations queued!`;
+
+            // IS-06: Track job IDs for SSE result collection
+            window._xyzJobIds = allJobIds;
+            window._xyzGridEl = gridEl;
         }
 
         /* ═══ Sprint 12 — Ollama Integration ═══ */
@@ -610,9 +627,19 @@
                 if (dot) { dot.style.background = '#ef4444'; dot.title = 'Ollama: Offline'; }
             }
         }
-        // Check on load and every 30s
-        setTimeout(checkOllamaStatus, 2000);
-        setInterval(checkOllamaStatus, 30000);
+        // IS-13: Lazy-init Ollama polling — only when Inference tab is active
+        window._ollamaPollingActive = false;
+        window._ollamaInterval = null;
+        function startOllamaPolling() {
+            if (window._ollamaPollingActive) return;
+            window._ollamaPollingActive = true;
+            checkOllamaStatus();
+            window._ollamaInterval = setInterval(checkOllamaStatus, 30000);
+        }
+        function stopOllamaPolling() {
+            window._ollamaPollingActive = false;
+            if (window._ollamaInterval) { clearInterval(window._ollamaInterval); window._ollamaInterval = null; }
+        }
 
         async function enhancePromptWithOllama() {
             const promptEl = document.getElementById('inf-prompt');

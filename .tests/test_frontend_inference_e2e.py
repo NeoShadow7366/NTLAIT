@@ -108,5 +108,5 @@ def test_generation_unreachable_engine(page: Page, base_url: str):
     generate_btn.click()
     
     # Because NO backend is running on 8188 for this test, the server API will immediately raise URLError
-    # Dashboard should show a toast notification and re-enable the button implicitly resolving to Launch Engine
-    expect(generate_btn).to_have_text(re.compile(r"Launch Engine|Backend Connected|Generate"), timeout=3000)
+    # S-1: Frontend now checks launch response before polling — shows "Launch Failed" on 404 (no package installed)
+    expect(generate_btn).to_have_text(re.compile(r"Launch Engine|Backend Connected|Generate|Launch Failed|Port Conflict"), timeout=3000)
