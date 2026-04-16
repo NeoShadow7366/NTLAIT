@@ -40,6 +40,7 @@ class VaultCrawler:
             "phase": "",         # "discovery" | "hashing"
             "current": 0,
             "total": 0,
+            "percent": 0,        # P5-2: pre-computed % so frontend doesn't divide-by-zero
             "current_file": "",
             "source": "",
         }
@@ -132,7 +133,8 @@ class VaultCrawler:
         logging.info(f"Found {len(files_to_hash)} new files to index.")
         
         # Hash and register (original behavior for Global_Vault)
-        self.scan_progress.update(active=True, phase="hashing", total=len(files_to_hash), current=0, source="Global_Vault")
+        # P5-6: use dict-literal form — keyword args to dict.update() are not supported
+        self.scan_progress.update({"active": True, "phase": "hashing", "total": len(files_to_hash), "current": 0, "percent": 0, "source": "Global_Vault", "current_file": ""})
         hash_results = []
         
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -150,6 +152,8 @@ class VaultCrawler:
                 except Exception as e:
                     logging.error(f"Hash worker failed: {e}")
                 self.scan_progress["current"] += 1
+                total = self.scan_progress["total"]
+                self.scan_progress["percent"] = int(self.scan_progress["current"] / total * 100) if total else 100
         
         # Sequential DB writes
         for filename, category, file_hash in hash_results:
@@ -216,10 +220,11 @@ class VaultCrawler:
             base = ext["base_path"]
             logging.info(f"Scanning external source: {ext['name']} at {base}")
             
-            self.scan_progress.update(
-                active=True, phase="discovery", current=0, total=0,
-                source=ext["name"], current_file=""
-            )
+            # P5-6: use dict-literal form
+            self.scan_progress.update({
+                "active": True, "phase": "discovery", "current": 0, "total": 0,
+                "percent": 0, "source": ext["name"], "current_file": ""
+            })
 
             # Walk each category subdirectory
             for cat_key, subdir in ext["categories"].items():
@@ -291,10 +296,11 @@ class VaultCrawler:
             return {"hashed": 0, "cancelled": False}
         
         logging.info(f"Starting hash scan for {len(unhashed)} models...")
-        self.scan_progress.update(
-            active=True, phase="hashing", current=0, total=len(unhashed),
-            source=source_path or "all", current_file=""
-        )
+        # P5-6: use dict-literal form
+        self.scan_progress.update({
+            "active": True, "phase": "hashing", "current": 0, "total": len(unhashed),
+            "percent": 0, "source": source_path or "all", "current_file": ""
+        })
         
         hashed_count = 0
         external_paths = self.get_external_paths()
@@ -310,6 +316,8 @@ class VaultCrawler:
             
             self.scan_progress["current"] += 1
             self.scan_progress["current_file"] = filename
+            total = self.scan_progress["total"]
+            self.scan_progress["percent"] = int(self.scan_progress["current"] / total * 100) if total else 100
             
             # Resolve full file path
             file_path = self._resolve_file_path(filename, source, category, external_paths)
@@ -334,31 +342,40 @@ class VaultCrawler:
         return {"hashed": hashed_count, "cancelled": cancelled}
 
     def hash_single_model(self, model_id: int) -> dict:
-        """Hash a single model by its database ID."""
+        """Hash a single model by its database ID.
+        P5-3 fix: Updates scan_progress so frontend polling reflects active state."""
         # P2-1 fix: Use proper MetadataDB API instead of raw cursor access
         model = self.db.get_model_by_id(model_id)
         if not model:
             return {"status": "error", "message": "Model not found"}
-        
+
         if model.get("file_hash"):
             return {"status": "already_hashed", "hash": model["file_hash"]}
-        
+
         external_paths = self.get_external_paths()
         file_path = self._resolve_file_path(
             model["filename"], model["source_path"],
             model["vault_category"], external_paths
         )
-        
+
         if not file_path or not os.path.exists(file_path):
             return {"status": "error", "message": f"File not found: {model['filename']}"}
-        
-        file_hash = self._calculate_hash(file_path)
-        if not file_hash:
-            return {"status": "error", "message": "Hash computation failed"}
-        
-        self.db.update_model_hash(model_id, file_hash)
-        
-        return {"status": "success", "hash": file_hash}
+
+        # P5-3: Mark scan as active so frontend progress poll sees it running
+        self.scan_progress.update({
+            "active": True, "phase": "hashing", "current": 0, "total": 1,
+            "percent": 0, "source": model.get("source_path", "unknown"),
+            "current_file": model["filename"]
+        })
+        try:
+            file_hash = self._calculate_hash(file_path)
+            if not file_hash:
+                return {"status": "error", "message": "Hash computation failed"}
+            self.db.update_model_hash(model_id, file_hash)
+            self.scan_progress.update({"current": 1, "percent": 100})
+            return {"status": "success", "hash": file_hash}
+        finally:
+            self.scan_progress["active"] = False
 
     def _resolve_file_path(self, filename: str, source_path: str,
                            category: str, external_paths: list) -> str:

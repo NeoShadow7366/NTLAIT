@@ -571,15 +571,26 @@ class VaultHandlersMixin:
 
     def handle_hash_single(self, data):
         """POST /api/vault/hash_single — Hash one model by DB id.
+        P5-1 fix: Runs in background thread so HTTP server isn't blocked during hashing.
         Body: {"model_id": 42}"""
+        import threading
         model_id = data.get("model_id")
         if not model_id:
             self.send_json_response({"error": "model_id required"}, 400)
             return
-        
+
         crawler = self._get_crawler()
-        result = crawler.hash_single_model(int(model_id))
-        self.send_json_response(result)
+        if crawler.scan_progress.get("active"):
+            self.send_json_response({"status": "busy", "message": "A scan is already in progress."}, 409)
+            return
+
+        def _run():
+            result = crawler.hash_single_model(int(model_id))
+            logging.info(f"hash_single complete: {result}")
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        self.send_json_response({"status": "started", "model_id": model_id})
 
     def handle_cancel_scan(self, data):
         """POST /api/vault/cancel_scan — Cancel the active scan/hash."""
@@ -654,7 +665,8 @@ class VaultHandlersMixin:
                         # Same size — likely same file, skip copy but still update DB
                         logging.info(f"File {fname} already exists at destination (same size), skipping copy.")
                         try:
-                            model = db.get_model_by_filename(fname)
+                            # P5-5: Use source-aware lookup to avoid wrong-record update
+                            model = db.get_model_by_filename_and_source(fname, "Global_Vault")
                             if model and model.get("file_hash"):
                                 db.update_model_source(model["file_hash"], dest_source,
                                                       self._map_vault_category(dest_subdir))
@@ -697,7 +709,8 @@ class VaultHandlersMixin:
                         continue
                     
                     # Update DB
-                    model = db.get_model_by_filename(fname)
+                    # P5-5: Use source-aware lookup to avoid wrong-record update
+                    model = db.get_model_by_filename_and_source(fname, "Global_Vault")
                     if model and model.get("file_hash"):
                         new_cat = self._map_vault_category(dest_subdir)
                         db.update_model_source(model["file_hash"], dest_source, new_cat)

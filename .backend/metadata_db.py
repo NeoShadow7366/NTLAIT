@@ -269,6 +269,17 @@ class MetadataDB:
 
         return dict(row) if row else None
 
+    def get_model_by_filename_and_source(self, filename: str, source_path: str):
+        """P5-5: Look up a model by filename scoped to a specific source_path.
+        Prevents wrong-record matches when the same filename exists in multiple sources."""
+        conn = self._conn
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT * FROM models WHERE filename = ? AND source_path = ? LIMIT 1',
+            (filename, source_path))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
     def get_model_by_id(self, model_id: int):
         """Look up a model by its database ID. Returns dict or None."""
         conn = self._conn

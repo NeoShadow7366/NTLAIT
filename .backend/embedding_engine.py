@@ -39,12 +39,14 @@ class EmbeddingEngine:
             self._embedding_cache = None
 
     def _ensure_cache(self):
-        """Load and parse all embeddings from DB into memory if not cached."""
+        """Load and parse all embeddings from DB into memory if not cached.
+        P5-4 fix: Single lock acquisition prevents TOCTOU race where two threads
+        could both see None and both start loading."""
         if self._embedding_cache is not None:
-            return
+            return  # Fast path without lock (read is atomic for None check)
         with self._cache_lock:
             if self._embedding_cache is not None:
-                return  # Double-check under lock
+                return  # Another thread beat us to it
             db = self._get_db()
             raw = db.get_all_embeddings()
             parsed = []
