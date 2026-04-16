@@ -1235,30 +1235,13 @@
                     <option value="text_encoders">Text Encoders</option>
                     <option value="upscalers">Upscalers</option>
                 </select>
-                <select id="vault-source-filter" onchange="filterVaultGrid(document.getElementById('vault-search').value)" class="select-fancy" style="width: auto;">
-                    <option value="">All Sources</option>
-                    <option value="Global_Vault">Local Vault</option>
-                </select>
                 <button onclick="triggerHealthCheck()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Clean Broken Package Links">🩺 Health Scan</button>
                 <button onclick="triggerUpdatesCheck()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Query CivitAI for newer versions">🔄 Check Updates</button>
             <button id="vault-select-toggle" onclick="toggleVaultSelectMode()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Multi-Select for Bulk Operations">☑️ Select</button>
                 <button onclick="triggerUnmanagedImport()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #a7f3d0; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Scan Global_Vault for local files and fetch metadata">📥 Import Local Files</button>
-                <button onclick="scanExternalLibrary()" style="margin-left: 10px; padding: 10px 15px; background: #0ea5e9; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Discover models from configured external paths (StabilityMatrix, etc.)">🔍 Scan External</button>
-                <button onclick="hashExternalLibrary()" style="margin-left: 10px; padding: 10px 15px; background: #8b5cf6; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Compute SHA-256 hashes for all unhashed models (enables CivitAI metadata)">🔐 Hash Library</button>
+                <button onclick="triggerExternalImport()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #fde047; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Link an external folder (e.g. Stability Matrix Models)">🔗 External Folder</button>
                 <button id="btn-vault-import-backup" onclick="document.getElementById('vault-import-file').click()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Import metadata from a vault export JSON">📤 Import Backup</button>
                 <input type="file" id="vault-import-file" accept=".json" style="display:none" onchange="handleVaultImportBackup(this.files[0])">
-            </div>
-
-            <!-- Scan Progress Bar -->
-            <div id="scan-progress-bar" style="display:none; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span id="scan-progress-label" style="font-weight: 600; font-size: 0.85rem;">Scanning...</span>
-                    <button onclick="cancelScan()" style="background: #ef4444; color: white; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem;">⏹️ Stop</button>
-                </div>
-                <div style="background: var(--surface-hover); border-radius: 6px; height: 8px; overflow: hidden;">
-                    <div id="scan-progress-fill" style="background: linear-gradient(90deg, #0ea5e9, #8b5cf6); height: 100%; width: 0%; border-radius: 6px; transition: width 0.3s;"></div>
-                </div>
-                <div id="scan-progress-detail" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;"></div>
             </div>
 
             <div class="grid" id="models-grid" style="--card-width: 250px;"></div>
@@ -1418,18 +1401,11 @@
                         </button>
                         <div style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:10px;" id="lb-download-meta"></div>
                     </div>
-                    <div id="lb-actions-vault" style="display:none; gap:10px; flex-wrap: wrap;">
+                    <div id="lb-actions-vault" style="display:none; gap:10px;">
                         <button onclick="executeVaultRepair()" style="background:#f59e0b; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;" title="Repair Metadata &amp; Images">Repair 🛠️</button>
                         <button onclick="executeVaultOpenFolder()" style="flex:1; background:var(--surface-hover); color:#fff; border:1px solid rgba(255,255,255,0.1); padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Open Folder</button>
                         <button onclick="executeVaultRedownload()" style="flex:1; background:var(--primary); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Redownload</button>
                         <button onclick="executeVaultDelete()" style="background:#ef4444; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Delete</button>
-                        <div id="lb-migrate-section" style="display:none; width:100%; margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <select id="lb-migrate-dest" class="select-fancy" style="flex:1; font-size:0.85rem;"></select>
-                                <button onclick="executeMigrate()" style="background:#0ea5e9; color:#fff; border:none; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer; white-space:nowrap;">📦 Migrate</button>
-                            </div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Move this model from Global Vault to the selected external library.</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1900,6 +1876,8 @@
                         <div id="inf-progress-fill" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(59, 130, 246, 0.4); transition: width 0.1s linear; pointer-events: none;"></div>
                         <span id="inf-generate-text" style="position: relative; z-index: 2;">Generate Image</span>
                     </button>
+                    <!-- IS-11: Cancel Generation Button (hidden by default) -->
+                    <button id="inf-cancel-btn" onclick="cancelInference()" style="display:none; height:50px; width:50px; flex-shrink:0; background:#ef4444; border:none; border-radius:8px; color:#fff; font-size:1.3rem; cursor:pointer; transition:all 0.15s;" title="Cancel Generation" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">🛑</button>
                     <button id="inf-inpaint-toggle" onclick="toggleInpaintMode()" style="height:50px; width:50px; flex-shrink:0; background:var(--surface-hover); border:1px solid var(--border); border-radius:8px; color:#94a3b8; font-size:1.3rem; cursor:pointer; transition:all 0.15s;" title="Toggle Inpaint Mode">🖌️</button>
                     <button id="inf-region-toggle" onclick="toggleRegionMode()" style="height:50px; width:50px; flex-shrink:0; background:var(--surface-hover); border:1px solid var(--border); border-radius:8px; color:#94a3b8; font-size:1.1rem; cursor:pointer; transition:all 0.15s;" title="Regional Prompting">📐</button>
                     <button id="inf-batch-add-btn" onclick="addToBatchQueue()" style="height:50px; width: 50px; flex-shrink:0; background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; border-radius:8px; color:#fff; font-size:1.3rem; cursor:pointer; transition:transform 0.15s;" title="Add to Batch Queue" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">+⏳</button>
@@ -2049,6 +2027,11 @@
         }
         
         async function uploadFileToProxy(file) {
+            // BUG-6 fix: Only ComfyUI requires server-side file upload.
+            // A1111/Forge use base64 inline in the payload — skip upload to avoid errors.
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            if (engine !== 'comfyui') return null;
+
             document.getElementById('inf-generate-btn').disabled = true;
             document.getElementById('inf-generate-text').innerText = "Uploading Image to Engine...";
             
@@ -2061,7 +2044,7 @@
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return data.name; 
             } catch(e) {
-                alert("Engine upload failed! Is it running?");
+                alert("Engine upload failed! Is ComfyUI running?");
                 document.getElementById('inf-generate-btn').disabled = false;
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return null;
@@ -2105,7 +2088,6 @@
             btn.style.color = '#cbd5e1';
             btn.onclick = launchActiveEngine;
             window.engineLaunching = false;
-            window.comfyLaunching = false;
             // I-11 fix: Clear stale ComfyUI img2img reference when switching engines
             window.comfyUploadedImg2Img = null;
             
@@ -2431,19 +2413,8 @@
             }
         }
 
-        function restoreMetadataFromDrop(e) {
-            const file = e.dataTransfer.files[0];
-            if(!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const img = document.getElementById('inf-canvas-img');
-                img.src = evt.target.result;
-                img.style.display = 'block';
-                document.getElementById('inf-canvas-empty').style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        }
+        // IS-09: restoreMetadataFromDrop is defined in 05_inference.js
+        // with full ComfyUI metadata extraction. No duplicate needed here.
 
         function repopulateUI(metadata) {
             if(!metadata) return;
@@ -2534,6 +2505,9 @@
             document.getElementById('view-packages').style.display = 'none';
             document.getElementById('view-settings').style.display = 'none';
             
+            // IS-13: Stop Ollama polling when leaving Inference tab
+            if (tabId !== 'inference' && typeof stopOllamaPolling === 'function') stopOllamaPolling();
+            
             if(tabId === 'dashboard') {
                 document.getElementById('view-dashboard').style.display = 'block';
                 document.getElementById('page-title').innerText = 'Dashboard';
@@ -2549,6 +2523,8 @@
                 document.getElementById('page-title').innerText = 'Inference Studio';
                 document.getElementById('page-subtitle').innerText = 'Generate artwork identically to Stability Matrix natively driven by ComfyUI.';
                 initInferenceUI();
+                // IS-13: Start Ollama polling only when Inference tab is active
+                if (typeof startOllamaPolling === 'function') startOllamaPolling();
             } else if(tabId === 'vault') {
                 document.getElementById('view-vault').style.display = 'block';
                 document.getElementById('page-title').innerText = 'Global Vault';
@@ -2585,7 +2561,7 @@
 
         function handleVaultFileDrop(event) {
             const files = Array.from(event.dataTransfer.files).filter(f =>
-                /\.(safetensors|ckpt|pt|bin)$/i.test(f.name)
+                /\.(safetensors|ckpt|pt|pth|bin|sft|gguf)$/i.test(f.name)
             );
             if(!files.length) return;
             openImportDialog(files);
@@ -2593,7 +2569,7 @@
 
         function handleVaultFileInput(fileList) {
             const files = Array.from(fileList).filter(f =>
-                /\.(safetensors|ckpt|pt|bin)$/i.test(f.name)
+                /\.(safetensors|ckpt|pt|pth|bin|sft|gguf)$/i.test(f.name)
             );
             if(!files.length) return;
             openImportDialog(files);
@@ -2713,7 +2689,6 @@
             window._semanticSearchActive = false;
             const cat = document.getElementById('vault-cat-filter').value.toLowerCase();
             const tag = document.getElementById('vault-tag-filter').value.toLowerCase();
-            const source = document.getElementById('vault-source-filter') ? document.getElementById('vault-source-filter').value : '';
             const q = (query || '').toLowerCase();
             const grid = document.getElementById('models-grid');
             
@@ -2722,13 +2697,11 @@
                 const cardCat = card.dataset.category || '';
                 const cardName = card.dataset.name || '';
                 const cardTags = card.dataset.tags || '';
-                const cardSource = (card.dataset.source || 'Global_Vault');
                 const matchesCat = !cat || cardCat === cat;
                 const matchesTag = !tag || cardTags.includes(tag);
-                const matchesSource = !source || cardSource === source;
                 // Local filter acts only on name if not performing semantic search
                 const matchesQ = !q || cardName.includes(q);
-                card.style.display = (matchesCat && matchesTag && matchesQ && matchesSource) ? '' : 'none';
+                card.style.display = (matchesCat && matchesTag && matchesQ) ? '' : 'none';
             });
         }
 
@@ -2747,7 +2720,7 @@
             try {
                 const res = await fetch(`/api/vault/search?query=${encodeURIComponent(query)}&limit=40`);
                 const data = await res.json();
-                renderVaultGrid(data.results || [], false);
+                renderVaultGrid(data.models || [], false);
                 document.getElementById('vault-load-more-container').style.display = 'none'; // Disable pagination for semantic search for now
             } catch(e) {
                 console.error("Semantic search failed:", e);
@@ -2763,6 +2736,7 @@
                 showToast('🔍 Vault indexing started...');
             } else if (data.status === 'completed') {
                 showToast(`✅ Vault indexing complete — ${data.indexed || 0} models indexed`);
+                // Refresh the vault grid to show newly indexed models
                 if (typeof loadModels === 'function') loadModels();
             } else if (data.status === 'progress') {
                 console.debug(`[Vault Crawl] ${data.phase || 'Scanning'}: ${data.current || 0}/${data.total || '?'}`);
@@ -2974,11 +2948,6 @@
             const g = _galleryData.find(x => x.id === id);
             if(!g) return;
             
-            // Rehydrate studio
-            if(g.prompt) {
-                const promptEl = document.getElementById('inf-prompt');
-                if(promptEl) promptEl.value = g.prompt;
-            }
             // Rehydrate studio — use actual DB column names (not negative_prompt/model_name)
             const setVal = (elId, val) => {
                 const el = document.getElementById(elId);
@@ -3438,11 +3407,10 @@
             }
         }
 
-        function openLightbox(modelId, localFile = null, localCategory = null, localSource = null) {
+        function openLightbox(modelId, localFile = null, localCategory = null) {
             window.isVaultMode = !!localFile;
             window.currentVaultFilename = localFile;
             window.currentVaultCategory = localCategory;
-            window.currentVaultSource = localSource || 'Global_Vault';
             
             const m = activeModels[modelId];
             if(!m) return;
@@ -3638,16 +3606,6 @@
             if(window.isVaultMode) {
                 btnStandard.style.display = 'none';
                 btnVault.style.display = 'flex';
-                // Show migrate section only for Global_Vault models
-                const migrateSection = document.getElementById('lb-migrate-section');
-                if (migrateSection) {
-                    if (window.currentVaultSource === 'Global_Vault') {
-                        migrateSection.style.display = 'block';
-                        populateMigrateDestinations();
-                    } else {
-                        migrateSection.style.display = 'none';
-                    }
-                }
             } else {
                 btnStandard.style.display = 'block';
                 btnVault.style.display = 'none';
@@ -3831,10 +3789,9 @@
                 
                 renderVaultGrid(data.models || [], append, data.total);
                 
-                // Also update the tags and source dropdown
+                // Also update the tags dropdown
                 if(!append) {
                     await loadVaultTags();
-                    if (typeof populateSourceFilter === 'function') populateSourceFilter();
                 }
             } catch (e) {
                 console.error(e);
@@ -3933,8 +3890,7 @@
                 };
                 activeModels[fakeParent.id] = fakeParent;
                 window.cardState[fakeParent.id] = 0;
-                clickStr = `onclick="openLightbox('${fakeParent.id}', '${item.filename}', '${item.vault_category}', '${item.source_path || 'Global_Vault'}')" style="cursor:pointer;"`;
-                fakeParent._sourcePath = item.source_path || 'Global_Vault';
+                clickStr = `onclick="openLightbox('${fakeParent.id}', '${item.filename}', '${item.vault_category}')" style="cursor:pointer;"`;
                 
                 // Render video or image preview based on media type
                 // Videos use the remote CivitAI URL; images use the local cached thumbnail
@@ -3943,7 +3899,7 @@
                     : `<img class="card-img" src="${imgSrc}" onerror="this.onerror=null;this.src='${_noPreviewSvg}'">`;
 
                 htmlParts.push(`
-                    <div class="card" data-category="${item.vault_category}" data-tags="${tagsList}" data-name="${displayName.toLowerCase()}" data-filename="${item.filename}" data-source="${item.source_path || 'Global_Vault'}" ${clickStr}>
+                    <div class="card" data-category="${item.vault_category}" data-tags="${tagsList}" data-name="${displayName.toLowerCase()}" data-filename="${item.filename}" ${clickStr}>
                         <input type="checkbox" class="vault-select-checkbox" data-filename="${item.filename}" data-category="${item.vault_category}" onclick="event.stopPropagation(); updateVaultSelection();">
                         <div class="card-img-container" style="padding-top:100%;">
                             ${mediaHtml}
@@ -3951,8 +3907,6 @@
                                 ${item.update_available === 1 ? '<span class="badge" style="background:#10b981; color:#fff; border:none; font-weight:bold; padding:4px 8px; font-size:0.75rem;">🔄 UPDATE</span>' : ''}
                                 ${isFlux ? '<span class="badge" style="background:#fbbf24; color:#000; border:none; font-weight:bold; padding:4px 8px; font-size:0.75rem;">FLUX</span>' : ''}
                                 <span class="badge" style="background:var(--primary); padding:4px 8px; font-size:0.75rem;">${item.vault_category}</span>
-                                ${(item.source_path && item.source_path !== 'Global_Vault') ? '<span class="badge" style="background:#0ea5e9; color:#fff; padding:3px 6px; font-size:0.65rem;">📂 EXT</span>' : ''}
-                                ${(!item.file_hash) ? '<span class="badge" style="background:#f59e0b; color:#000; padding:3px 6px; font-size:0.65rem;">⏳ No Hash</span>' : ''}
                             </div>
                         </div>
                         <div class="card-banner" style="position:relative; background:var(--surface);">
@@ -4008,10 +3962,10 @@
 
                 data.packages.forEach(p => {
                     let runBtns = p.is_running ? `
-                        <button onclick="stopPackage('${p.id}', event)" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Stop Process</button>
-                        <button onclick="restartPackage('${p.id}', event)" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Restart Engine</button>
+                        <button onclick="stopPackage('${p.id}')" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Stop Process</button>
+                        <button onclick="restartPackage('${p.id}')" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Restart Engine</button>
                     ` : `
-                        <button onclick="launchPackage('${p.id}', event)" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Launch UI</button>
+                        <button onclick="launchPackage('${p.id}')" style="background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Launch UI</button>
                     `;
                     
                     const statusDot = p.is_running ? `<div class="progress-pulsing" style="width:10px; height:10px; border-radius:50%; background:#10b981; display:inline-block; margin-left:8px;" title="Running"></div>` : '';
@@ -4029,10 +3983,9 @@
                                 ${runBtns}
                                 <button onclick="openLogTerminal('${p.id}', '${p.name}')" style="background: var(--surface-hover); color: white; border: 1px solid var(--border); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">⌨️ Terminal</button>
                                 <button onclick="openExtensions('${p.id}', '${p.name}')" style="background: #8b5cf6; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;">Plugins</button>
-                                <button onclick="openModelPaths('${p.id}', '${p.name}')" style="background: #0ea5e9; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Configure extra model search paths">⚙️ Model Paths</button>
                                 <button onclick="repairDependencies('${p.id}')" style="background: #a78bfa; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Fix missing Python packages (PyTorch CUDA, etc.)">💊 Fix Deps</button>
                                 <button onclick="repairPackage('${p.id}')" style="background: #f59e0b; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Re-download source code">🔧 Repair</button>
-                                <button onclick="uninstallPackage('${p.id}', event)" style="background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Uninstall">Uninstall</button>
+                                <button onclick="uninstallPackage('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Uninstall">Uninstall</button>
                             </div>
                         </div>
                     `;
@@ -4177,64 +4130,75 @@
                     body: JSON.stringify({package_id: packageId})
                 });
                 const response = await res.json();
-                if(response.status === 'success') {
-                    if(response.already_running && response.url) {
-                        window.open(response.url, '_blank');
-                        loadPackages();
-                        return;
-                    }
-                    // Show warm-up status on the card
-                    const statusEl = document.getElementById(`pkg-status-${packageId}`);
-                    if(statusEl) {
-                        statusEl.style.display = 'block';
-                        statusEl.innerHTML = '<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Initializing engine...';
-                    }
-                    btn.innerText = "Starting...";
-                    // Connectivity poll: wait for the engine to actually respond
-                    if(response.url) {
-                        let attempts = 0;
-                        const maxAttempts = 60; // 60 × 2s = 2 minutes max
-                        const pollId = setInterval(async () => {
-                            attempts++;
-                            if(statusEl) statusEl.innerHTML = `<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Warming up engine... (${attempts}s)`;
-                            try {
-                                // P-2 fix: Use backend probe instead of fragile no-cors fetch
-                                const probe = await fetch('/api/probe_url', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({url: response.url}),
-                                    signal: AbortSignal.timeout(3000)
-                                });
-                                const probeData = await probe.json();
-                                if (probeData.reachable) {
-                                    clearInterval(pollId);
-                                    if(statusEl) { statusEl.innerHTML = '✅ Engine ready!'; setTimeout(() => { statusEl.style.display = 'none'; }, 2000); }
-                                    window.open(response.url, '_blank');
-                                    loadPackages();
-                                }
-                            } catch(_) {
-                                if(attempts >= maxAttempts) {
-                                    clearInterval(pollId);
-                                    if(statusEl) { statusEl.innerHTML = '⚠️ Engine may still be loading. <a href="' + response.url + '" target="_blank" style="color:#a78bfa;">Open manually →</a>'; }
-                                    loadPackages();
-                                }
-                            }
-                        }, 2000);
-                    }
-                    loadPackages();
-                } else {
-                    // Check if server says we need a repair
-                    if(response.needs_repair) {
-                        const statusEl = document.getElementById(`pkg-status-${packageId}`);
-                        if(statusEl) {
-                            statusEl.style.display = 'block';
-                            statusEl.innerHTML = '⚠️ Source code missing. <a href="#" onclick="repairPackage(\'' + packageId + '\'); return false;" style="color:#f59e0b; text-decoration:underline;">Click here to repair</a>';
-                        }
-                        btn.innerText = 'Launch UI'; btn.disabled = false;
-                    } else {
-                        alert(response.message); btn.innerText = 'Launch UI'; btn.disabled = false;
-                    }
+
+                // S-6: Store port for WebSocket connection
+                if (response.port && packageId === 'comfyui') {
+                    window._comfyPort = response.port;
                 }
+
+                // S-7: Handle port conflict (409) and other non-success responses
+                if (!res.ok || response.status === 'error') {
+                    const statusEl = document.getElementById(`pkg-status-${packageId}`);
+                    if (statusEl) {
+                        statusEl.style.display = 'block';
+                        if (response.port_conflict) {
+                            statusEl.innerHTML = `⚠️ Port ${response.port || ''} is already in use. Stop the other process first or change the port in the recipe.`;
+                        } else if (response.needs_repair) {
+                            statusEl.innerHTML = '⚠️ Source code missing. <a href="#" onclick="repairPackage(\'' + packageId + '\'); return false;" style="color:#f59e0b; text-decoration:underline;">Click here to repair</a>';
+                        } else {
+                            statusEl.innerHTML = '❌ ' + (response.message || 'Launch failed');
+                        }
+                    } else {
+                        showToast(`🚫 ${response.message || 'Launch failed'}`);
+                    }
+                    btn.innerText = 'Launch UI'; btn.disabled = false;
+                    return;
+                }
+
+                if(response.already_running && response.url) {
+                    window.open(response.url, '_blank');
+                    loadPackages();
+                    return;
+                }
+                // Show warm-up status on the card
+                const statusEl = document.getElementById(`pkg-status-${packageId}`);
+                if(statusEl) {
+                    statusEl.style.display = 'block';
+                    statusEl.innerHTML = '<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Initializing engine...';
+                }
+                btn.innerText = "Starting...";
+                // Connectivity poll: wait for the engine to actually respond
+                if(response.url) {
+                    let attempts = 0;
+                    const maxAttempts = 60; // 60 × 2s = 2 minutes max
+                    const pollId = setInterval(async () => {
+                        attempts++;
+                        if(statusEl) statusEl.innerHTML = `<span class="progress-pulsing" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#a78bfa; margin-right:6px;"></span>Warming up engine... (${attempts}s)`;
+                        try {
+                            // P-2 fix: Use backend probe instead of fragile no-cors fetch
+                            const probe = await fetch('/api/probe_url', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({url: response.url}),
+                                signal: AbortSignal.timeout(3000)
+                            });
+                            const probeData = await probe.json();
+                            if (probeData.reachable) {
+                                clearInterval(pollId);
+                                if(statusEl) { statusEl.innerHTML = '✅ Engine ready!'; setTimeout(() => { statusEl.style.display = 'none'; }, 2000); }
+                                window.open(response.url, '_blank');
+                                loadPackages();
+                            }
+                        } catch(_) {
+                            if(attempts >= maxAttempts) {
+                                clearInterval(pollId);
+                                if(statusEl) { statusEl.innerHTML = '⚠️ Engine may still be loading. <a href="' + response.url + '" target="_blank" style="color:#a78bfa;">Open manually →</a>'; }
+                                loadPackages();
+                            }
+                        }
+                    }, 2000);
+                }
+                loadPackages();
             } catch(e) { alert("Failed to contact server"); btn.innerText = 'Launch UI'; btn.disabled = false; }
         }
 
@@ -4436,383 +4400,6 @@
             if(terminalInterval) clearInterval(terminalInterval);
         }
 
-        /* ═══════════════════════════════════════════════
-           MODEL PATHS CONFIGURATION
-        ═══════════════════════════════════════════════ */
-        let _mpPackageId = '';
-        const _mpCategories = ['base_path', 'checkpoints', 'loras', 'vae', 'controlnet', 'unet', 'clip', 'embeddings', 'upscale_models', 'hypernetworks'];
-
-        async function openModelPaths(packageId, packageName) {
-            _mpPackageId = packageId;
-            document.getElementById('mp-pkg-name').innerText = packageName + ' — extra_model_paths.yaml';
-            document.getElementById('model-paths-modal').style.display = 'flex';
-            document.getElementById('mp-sections').innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Loading...</div>';
-
-            try {
-                const res = await fetch(`/api/model_paths?package_id=${packageId}`);
-                const data = await res.json();
-                if (data.status !== 'success') {
-                    document.getElementById('mp-sections').innerHTML = `<div style="color:#ef4444; padding:20px;">Error: ${data.message}</div>`;
-                    return;
-                }
-                renderModelPathSections(data.sections || {});
-            } catch (e) {
-                document.getElementById('mp-sections').innerHTML = `<div style="color:#ef4444; padding:20px;">Failed to load: ${e.message}</div>`;
-            }
-        }
-
-        function closeModelPaths() {
-            document.getElementById('model-paths-modal').style.display = 'none';
-        }
-
-        function renderModelPathSections(sections) {
-            const container = document.getElementById('mp-sections');
-            container.innerHTML = '';
-
-            if (Object.keys(sections).length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted); font-style:italic;">No model path sources configured yet. Click "+ Add Source" to add one.</div>';
-                return;
-            }
-
-            for (const [sectionName, entries] of Object.entries(sections)) {
-                container.innerHTML += renderSectionCard(sectionName, entries);
-            }
-        }
-
-        function renderSectionCard(name, entries) {
-            const basePath = entries.base_path || '';
-            let fieldsHtml = '';
-
-            // Base path first
-            fieldsHtml += `
-                <div style="margin-bottom: 10px;">
-                    <label style="font-size: 0.75rem; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Base Path</label>
-                    <input type="text" class="mp-input" data-section="${name}" data-key="base_path" value="${escHtml(basePath)}"
-                        style="width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: monospace; font-size: 0.85rem; box-sizing: border-box; margin-top: 4px;"
-                        placeholder="e.g. I:\\Models\\">
-                </div>
-            `;
-
-            // Category paths (skip base_path since it's already shown)
-            const categories = Object.keys(entries).filter(k => k !== 'base_path');
-            // Also add empty slots for common categories not yet defined
-            const common = ['checkpoints', 'loras', 'vae', 'controlnet', 'unet', 'clip', 'embeddings'];
-            const allKeys = [...new Set([...categories, ...common])];
-
-            fieldsHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">';
-            for (const key of allKeys) {
-                const val = entries[key] || '';
-                fieldsHtml += `
-                    <div>
-                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">${key}</label>
-                        <input type="text" class="mp-input" data-section="${name}" data-key="${key}" value="${escHtml(val)}"
-                            style="width: 100%; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-family: monospace; font-size: 0.8rem; box-sizing: border-box; margin-top: 2px;"
-                            placeholder="subfolder/">
-                    </div>
-                `;
-            }
-            fieldsHtml += '</div>';
-
-            return `
-                <div class="std-card" style="margin-bottom: 12px; position: relative; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <input type="text" class="mp-section-name" data-original="${name}" value="${escHtml(name)}"
-                            style="background: none; border: none; color: var(--text); font-size: 1rem; font-weight: 700; padding: 0; outline: none; border-bottom: 1px dashed var(--border); flex: 1; max-width: 300px;">
-                        <button onclick="this.closest('.std-card').remove()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem; font-weight: 600;" title="Remove this source">🗑️ Remove</button>
-                    </div>
-                    ${fieldsHtml}
-                </div>
-            `;
-        }
-
-        function addModelPathSection() {
-            const container = document.getElementById('mp-sections');
-            // Remove empty-state message if present
-            const emptyMsg = container.querySelector('div[style*="italic"]');
-            if (emptyMsg) emptyMsg.remove();
-
-            const idx = container.querySelectorAll('.std-card').length + 1;
-            const name = 'new_source_' + idx;
-            container.innerHTML += renderSectionCard(name, {base_path: ''});
-        }
-
-        async function saveModelPaths() {
-            const btn = document.getElementById('mp-save-btn');
-            btn.innerText = 'Saving...';
-            btn.disabled = true;
-
-            // Collect data from inputs
-            const sections = {};
-            const cards = document.querySelectorAll('#mp-sections .std-card');
-            cards.forEach(card => {
-                const nameInput = card.querySelector('.mp-section-name');
-                const sectionName = nameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_') || 'unnamed';
-                sections[sectionName] = {};
-
-                card.querySelectorAll('.mp-input').forEach(input => {
-                    const key = input.dataset.key;
-                    const val = input.value.trim();
-                    if (val) sections[sectionName][key] = val;
-                });
-            });
-
-            try {
-                const res = await fetch('/api/model_paths', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ package_id: _mpPackageId, sections })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    closeModelPaths();
-                    showToast('Model paths saved successfully!');
-                    // Prompt restart
-                    if (confirm('Model paths saved. Restart ' + _mpPackageId + ' now for changes to take effect?')) {
-                        const pkg = (window.activePackages || []).find(p => p.id === _mpPackageId);
-                        if (pkg && pkg.is_running) {
-                            await fetch('/api/restart', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ package_id: _mpPackageId })
-                            });
-                            showToast(_mpPackageId + ' restarting...');
-                        } else {
-                            showToast('Engine not running — changes will apply next launch.');
-                        }
-                        loadPackages();
-                    }
-                } else {
-                    alert('Failed to save: ' + data.message);
-                }
-            } catch (e) {
-                alert('Server error: ' + e.message);
-            } finally {
-                btn.innerText = 'Save & Restart';
-                btn.disabled = false;
-            }
-        }
-
-        /* ═══════════════════════════════════════════════
-           MULTI-PATH SCANNING
-        ═══════════════════════════════════════════════ */
-        let _scanPollInterval = null;
-
-        async function scanExternalLibrary() {
-            try {
-                const res = await fetch('/api/vault/scan_external', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
-                });
-                const data = await res.json();
-                if (data.status === 'busy') {
-                    showToast('A scan is already in progress.');
-                    return;
-                }
-                showToast('External library scan started...');
-                startScanProgressPoll();
-            } catch (e) {
-                alert('Failed to start scan: ' + e.message);
-            }
-        }
-
-        async function hashExternalLibrary() {
-            try {
-                const res = await fetch('/api/vault/hash_library', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
-                });
-                const data = await res.json();
-                if (data.status === 'busy') {
-                    showToast('A scan is already in progress.');
-                    return;
-                }
-                showToast('Hash computation started... This may take a while for large libraries.');
-                startScanProgressPoll();
-            } catch (e) {
-                alert('Failed to start hashing: ' + e.message);
-            }
-        }
-
-        async function cancelScan() {
-            try {
-                await fetch('/api/vault/cancel_scan', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: '{}'
-                });
-                showToast('Scan cancellation requested.');
-            } catch (e) {
-                console.error('Cancel failed:', e);
-            }
-        }
-
-        function startScanProgressPoll() {
-            const bar = document.getElementById('scan-progress-bar');
-            bar.style.display = 'block';
-
-            if (_scanPollInterval) clearInterval(_scanPollInterval);
-            _scanPollInterval = setInterval(async () => {
-                try {
-                    const res = await fetch('/api/vault/scan_progress');
-                    const prog = await res.json();
-                    
-                    const label = document.getElementById('scan-progress-label');
-                    const fill = document.getElementById('scan-progress-fill');
-                    const detail = document.getElementById('scan-progress-detail');
-                    
-                    if (!prog.active) {
-                        clearInterval(_scanPollInterval);
-                        _scanPollInterval = null;
-                        bar.style.display = 'none';
-                        showToast('Scan complete!');
-                        loadModels(false); // Refresh the grid
-                        populateSourceFilter(); // Refresh source dropdown
-                        return;
-                    }
-
-                    const pct = prog.total > 0 ? Math.round((prog.current / prog.total) * 100) : 0;
-                    label.innerText = `${prog.phase === 'discovery' ? '🔍 Discovering' : '🔐 Hashing'} — ${prog.source || ''}`;
-                    fill.style.width = pct + '%';
-                    detail.innerText = `${prog.current} / ${prog.total} — ${prog.current_file || ''}`;
-                } catch (e) {
-                    console.error('Progress poll error:', e);
-                }
-            }, 1500);
-        }
-
-        async function populateSourceFilter() {
-            try {
-                const res = await fetch('/api/vault/external_sources');
-                const data = await res.json();
-                const select = document.getElementById('vault-source-filter');
-                if (!select) return;
-                
-                // Preserve current selection
-                const current = select.value;
-                
-                // Rebuild options
-                select.innerHTML = '<option value="">All Sources</option><option value="Global_Vault">Local Vault</option>';
-                (data.sources || []).forEach(src => {
-                    const opt = document.createElement('option');
-                    opt.value = src.source_tag;
-                    opt.textContent = '📂 ' + src.name;
-                    select.appendChild(opt);
-                });
-                
-                select.value = current;
-            } catch (e) {
-                console.error('Failed to populate source filter:', e);
-            }
-        }
-
-        // Populate source filter when vault tab loads
-        const _origLoadModels = typeof loadModels === 'function' ? null : null; // Handled inline
-
-        /* ═══════════════════════════════════════════════
-           MODEL MIGRATION
-        ═══════════════════════════════════════════════ */
-        let _cachedExternalSources = null;
-
-        async function populateMigrateDestinations() {
-            const select = document.getElementById('lb-migrate-dest');
-            if (!select) return;
-            
-            try {
-                if (!_cachedExternalSources) {
-                    const res = await fetch('/api/vault/external_sources');
-                    const data = await res.json();
-                    _cachedExternalSources = data.sources || [];
-                }
-                
-                select.innerHTML = '';
-                const category = window.currentVaultCategory || 'checkpoints';
-                
-                _cachedExternalSources.forEach(src => {
-                    // Find the matching category subdirectory for the current model
-                    const catMap = {
-                        'checkpoints': 'checkpoints',
-                        'loras': 'loras',
-                        'vaes': 'vae',
-                        'controlnet': 'controlnet',
-                        'unet': 'unet',
-                        'clip': 'clip',
-                        'embeddings': 'embeddings',
-                    };
-                    const catKey = catMap[category] || category;
-                    const subdir = src.categories[catKey] || '';
-                    
-                    if (subdir) {
-                        const opt = document.createElement('option');
-                        opt.value = JSON.stringify({
-                            base: src.base_path,
-                            subdir: subdir,
-                            source_tag: src.source_tag,
-                            name: src.name
-                        });
-                        opt.textContent = `📂 ${src.name} → ${subdir}`;
-                        select.appendChild(opt);
-                    }
-                });
-                
-                if (select.options.length === 0) {
-                    const opt = document.createElement('option');
-                    opt.textContent = 'No external paths configured for this category';
-                    opt.disabled = true;
-                    select.appendChild(opt);
-                }
-            } catch (e) {
-                console.error('Failed to load migration destinations:', e);
-            }
-        }
-
-        async function executeMigrate() {
-            const select = document.getElementById('lb-migrate-dest');
-            if (!select || !select.value) return;
-            
-            const filename = window.currentVaultFilename;
-            const category = window.currentVaultCategory;
-            if (!filename || !category) return;
-            
-            let dest;
-            try {
-                dest = JSON.parse(select.value);
-            } catch (e) {
-                alert('Invalid destination');
-                return;
-            }
-            
-            if (!confirm(`Move "${filename}" to ${dest.name}/${dest.subdir}?\n\nThe file will be copied, verified, then removed from Global Vault.`)) {
-                return;
-            }
-            
-            try {
-                const res = await fetch('/api/vault/migrate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filenames: [filename],
-                        destination_base: dest.base,
-                        destination_subdir: dest.subdir,
-                        destination_source: dest.source_tag,
-                        source_category: category
-                    })
-                });
-                const data = await res.json();
-                if (data.status === 'started') {
-                    showToast(`Migrating ${filename}...`);
-                    closeLightbox();
-                    // Refresh vault after a delay
-                    setTimeout(() => loadModels(false), 5000);
-                } else {
-                    alert('Migration failed: ' + (data.error || 'Unknown error'));
-                }
-            } catch (e) {
-                alert('Migration request failed: ' + e.message);
-            }
-        }
-        
         /* ═══════════════════════════════════════════════
            VAULT HEALTH & UPDATES
         ═══════════════════════════════════════════════ */
@@ -5149,6 +4736,14 @@
             canvas.style.height = imgRect.height + 'px';
         }
 
+        // IS-07: Debounced window resize handler to keep inpaint canvas aligned
+        let _resizeDebounce = null;
+        window.addEventListener('resize', () => {
+            if (!window._inpaintActive) return;
+            clearTimeout(_resizeDebounce);
+            _resizeDebounce = setTimeout(resizeInpaintCanvas, 150);
+        });
+
         function setInpaintTool(tool) {
             window._inpaintTool = tool;
             document.getElementById('inpaint-brush-btn').classList.toggle('active-tool', tool === 'brush');
@@ -5283,6 +4878,8 @@
             const canvas = document.getElementById('inpaint-canvas');
             const rect = canvas.getBoundingClientRect();
             // I-7 fix: Scale from display coordinates to canvas internal coordinates
+            // getBoundingClientRect already reflects CSS transforms, but the canvas
+            // internal resolution (canvas.width) may differ from display size (rect.width)
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             return {
@@ -5351,39 +4948,30 @@
             document.getElementById('inf-width').value = newW;
             document.getElementById('inf-height').value = newH;
 
-            // Auto-create mask for the extended region
+            // IS-08: Use img.onload instead of fragile setTimeout
+            // Auto-create mask for the extended region after image loads
+            function _applyOutpaintMask() {
+                resizeInpaintCanvas();
+                const maskCanvas = document.getElementById('inpaint-canvas');
+                const mctx = maskCanvas.getContext('2d');
+                mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+                const scaleX = maskCanvas.width / newW;
+                const scaleY = maskCanvas.height / newH;
+
+                mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+                if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
+                if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
+                if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
+                if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
+            }
+
             if (window._inpaintActive) {
-                setTimeout(() => {
-                    resizeInpaintCanvas();
-                    const maskCanvas = document.getElementById('inpaint-canvas');
-                    const mctx = maskCanvas.getContext('2d');
-                    mctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-
-                    // Scale to display coordinates
-                    const scaleX = maskCanvas.width / newW;
-                    const scaleY = maskCanvas.height / newH;
-
-                    mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-                    if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
-                    if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
-                }, 200);
+                img.onload = _applyOutpaintMask;
             } else {
                 // Auto-enable inpaint mode for outpainting
                 toggleInpaintMode();
-                setTimeout(() => {
-                    const maskCanvas = document.getElementById('inpaint-canvas');
-                    const mctx = maskCanvas.getContext('2d');
-                    const scaleX = maskCanvas.width / newW;
-                    const scaleY = maskCanvas.height / newH;
-
-                    mctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-                    if (direction === 'up')    mctx.fillRect(0, 0, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'down')  mctx.fillRect(0, maskCanvas.height - extendSize * scaleY, maskCanvas.width, extendSize * scaleY);
-                    if (direction === 'left')  mctx.fillRect(0, 0, extendSize * scaleX, maskCanvas.height);
-                    if (direction === 'right') mctx.fillRect(maskCanvas.width - extendSize * scaleX, 0, extendSize * scaleX, maskCanvas.height);
-                }, 300);
+                img.onload = _applyOutpaintMask;
             }
         }
 
@@ -5603,13 +5191,16 @@
 
             // Queue all to batch
             let queued = 0;
+            const allJobIds = [];
             for (const combo of combos) {
                 try {
-                    await fetch('/api/generate/batch', {
+                    const res = await fetch('/api/generate/batch', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ payload: combo })
                     });
+                    const resData = await res.json();
+                    if (resData.job_ids) allJobIds.push(...resData.job_ids);
                     queued++;
                     statusEl.textContent = `Queued ${queued} / ${combos.length}...`;
                 } catch(e) {
@@ -5617,13 +5208,20 @@
                 }
             }
 
-            statusEl.textContent = `✅ ${queued} generations queued! Check Batch Queue for results.`;
+            statusEl.textContent = `✅ ${queued} generations queued!`;
             
-            // Show grid layout info
+            // IS-06: Track job IDs for SSE-driven result collection
+            window._xyzJobIds = allJobIds;
+            window._xyzCombos = combos;
+            window._xyzGridEl = gridEl;
+
+            // Show grid layout with placeholders
             gridEl.style.display = 'grid';
             gridEl.style.gridTemplateColumns = `repeat(${xList.length}, 1fr)`;
-            gridEl.innerHTML = combos.map(c => 
-                `<div class="xyz-grid-label">${c._xyz_label}</div>`
+            gridEl.innerHTML = combos.map((c, i) => 
+                `<div class="xyz-grid-cell" data-xyz-idx="${i}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,0.2); font-size:0.7rem; color:var(--text-muted); padding:4px; text-align:center; position:relative; overflow:hidden;">
+                    <span class="xyz-grid-label">${c._xyz_label}</span>
+                </div>`
             ).join('');
         }
 
@@ -5633,10 +5231,11 @@
         }
 
         function applyAxisValue(payload, param, value) {
+            // IS-05: Use unified payload field names (cfg_scale, sampler_name)
             switch(param) {
                 case 'steps': payload.steps = parseInt(value); break;
-                case 'cfg': payload.cfg = parseFloat(value); break;
-                case 'sampler': payload.sampler = value; break;
+                case 'cfg': payload.cfg_scale = parseFloat(value); break;
+                case 'sampler': payload.sampler_name = value; break;
                 case 'seed': payload.seed = parseInt(value); break;
                 case 'width': payload.width = parseInt(value); break;
                 case 'height': payload.height = parseInt(value); break;
@@ -5667,23 +5266,30 @@
             gridEl.innerHTML = '';
 
             let queued = 0;
+            const allJobIds = [];
             for (let i = 0; i < count; i++) {
                 const p = JSON.parse(JSON.stringify(basePayload));
                 p.seed = baseSeed + i;
                 try {
-                    await fetch('/api/generate/batch', {
+                    const res = await fetch('/api/generate/batch', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(p)
+                        body: JSON.stringify({ payload: p })
                     });
+                    const data = await res.json();
+                    if (data.job_ids) allJobIds.push(...data.job_ids);
                     queued++;
-                    gridEl.innerHTML += `<div class="xyz-grid-label">Seed: ${p.seed}</div>`;
+                    gridEl.innerHTML += `<div class="xyz-grid-cell" data-xyz-idx="${i}" style="aspect-ratio:1; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,0.2); font-size:0.7rem; color:var(--text-muted); padding:4px; text-align:center;"><span class="xyz-grid-label">Seed: ${p.seed}</span></div>`;
                     statusEl.textContent = `Queued ${queued} / ${count}...`;
                 } catch(e) {
                     console.error('Seed explorer queue error:', e);
                 }
             }
             statusEl.textContent = `✅ ${queued} seed variations queued!`;
+
+            // IS-06: Track job IDs for SSE result collection
+            window._xyzJobIds = allJobIds;
+            window._xyzGridEl = gridEl;
         }
 
         /* ═══ Sprint 12 — Ollama Integration ═══ */
@@ -5706,9 +5312,19 @@
                 if (dot) { dot.style.background = '#ef4444'; dot.title = 'Ollama: Offline'; }
             }
         }
-        // Check on load and every 30s
-        setTimeout(checkOllamaStatus, 2000);
-        setInterval(checkOllamaStatus, 30000);
+        // IS-13: Lazy-init Ollama polling — only when Inference tab is active
+        window._ollamaPollingActive = false;
+        window._ollamaInterval = null;
+        function startOllamaPolling() {
+            if (window._ollamaPollingActive) return;
+            window._ollamaPollingActive = true;
+            checkOllamaStatus();
+            window._ollamaInterval = setInterval(checkOllamaStatus, 30000);
+        }
+        function stopOllamaPolling() {
+            window._ollamaPollingActive = false;
+            if (window._ollamaInterval) { clearInterval(window._ollamaInterval); window._ollamaInterval = null; }
+        }
 
         async function enhancePromptWithOllama() {
             const promptEl = document.getElementById('inf-prompt');
@@ -5888,6 +5504,105 @@
             alert("Settings successfully restored from image metadata!");
         }
 
+        /* ═══ IS-01/IS-05: Unified Generation Payload Builder ═══
+           Single source of truth for both executeInference() and getInferencePayload().
+           Returns a payload compatible with build_comfy_workflow() field names. */
+        function buildGenerationPayload() {
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            const modelType = document.getElementById('inf-model-type')?.value || 'sdxl';
+
+            const payload = {
+                engine: engine,
+                backend: engine,  // Alias for batch queue's _batch_worker
+                model_type: modelType,
+                prompt: document.getElementById('inf-prompt')?.value || '',
+                negative_prompt: document.getElementById('inf-negative')?.value || '',
+                seed: parseInt(document.getElementById('inf-seed')?.value || '-1'),
+                steps: parseInt(document.getElementById('inf-steps')?.value || '20'),
+                cfg_scale: parseFloat(document.getElementById('inf-cfg')?.value || '7'),
+                width: parseInt(document.getElementById('inf-width')?.value || '1024'),
+                height: parseInt(document.getElementById('inf-height')?.value || '1024'),
+                sampler_name: document.getElementById('inf-sampler')?.value || 'euler',
+                scheduler: document.getElementById('inf-scheduler')?.value || 'normal',
+                override_settings: {
+                    sd_model_checkpoint: document.getElementById('inf-model')?.value || ''
+                },
+                vae: document.getElementById('inf-vae')?.value || 'none',
+                refiner: document.getElementById('inf-refiner')?.value || 'none',
+                refiner_steps: parseInt(document.getElementById('inf-refiner-steps')?.value || '10')
+            };
+
+            // FLUX parameters
+            if (modelType.includes('flux')) {
+                payload.flux_unet = document.getElementById('inf-flux-unet')?.value || '';
+                payload.flux_clip_l = document.getElementById('inf-flux-clip-l')?.value || '';
+                payload.flux_t5xxl = document.getElementById('inf-flux-t5xxl')?.value || '';
+                payload.flux_guidance = parseFloat(document.getElementById('inf-flux-guidance')?.value || '3.5');
+            }
+
+            // LoRAs
+            payload.loras = [];
+            document.querySelectorAll('#inf-lora-container > div').forEach(row => {
+                const sel = row.querySelector('.lora-select');
+                const wgt = row.querySelector('.lora-weight');
+                if (sel && wgt && sel.value && sel.value !== 'none') {
+                    payload.loras.push({ name: sel.value, weight: parseFloat(wgt.value) });
+                }
+            });
+
+            // Img2Img
+            if (window.comfyUploadedImg2Img) {
+                payload.init_image_name = window.comfyUploadedImg2Img;
+                payload.init_image_b64 = window.comfyUploadedImg2ImgB64;
+                payload.denoising_strength = parseFloat(document.getElementById('inf-img2img-denoise')?.value || '0.75');
+            }
+
+            // Hires Fix
+            const doHires = document.getElementById('inf-hires-enable')?.checked;
+            if (doHires && !payload.init_image_name) {
+                payload.hires = {
+                    enable: true,
+                    factor: parseFloat(document.getElementById('inf-hires-factor')?.value || '1.5'),
+                    denoise: parseFloat(document.getElementById('inf-hires-denoise')?.value || '0.4'),
+                    steps: parseInt(document.getElementById('inf-hires-steps')?.value || '10'),
+                    upscaler: document.getElementById('inf-hires-upscaler')?.value || 'latent'
+                };
+            }
+
+            // ControlNet
+            const cnEnable = document.getElementById('inf-cn-enable')?.checked;
+            if (cnEnable && window.comfyUploadedCn) {
+                payload.controlnet = {
+                    enable: true,
+                    model: document.getElementById('inf-cn-model')?.value || '',
+                    strength: parseFloat(document.getElementById('inf-cn-strength')?.value || '1.0'),
+                    image: window.comfyUploadedCn,
+                    image_b64: window.comfyUploadedCnB64
+                };
+            }
+
+            // IS-01: Inpainting mask (was missing from executeInference)
+            if (typeof hasInpaintMask === 'function' && hasInpaintMask()) {
+                payload.mask_b64 = getInpaintMaskBase64();
+                const canvasImg = document.getElementById('inf-canvas-img');
+                if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none' && !payload.init_image_b64) {
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width = canvasImg.naturalWidth;
+                    tmpCanvas.height = canvasImg.naturalHeight;
+                    tmpCanvas.getContext('2d').drawImage(canvasImg, 0, 0);
+                    payload.init_image_b64 = tmpCanvas.toDataURL('image/png').split(',')[1];
+                }
+            }
+
+            // IS-01: Regional prompting (was missing from executeInference)
+            if (typeof getRegionData === 'function') {
+                const regionData = getRegionData();
+                if (regionData) payload.regions = regionData;
+            }
+
+            return payload;
+        }
+
         async function initInferenceUI() {
             // Check selected engine server status
             const engine = document.getElementById('inf-engine')?.value || 'comfyui';
@@ -5907,7 +5622,7 @@
                 if(!res.ok) throw new Error("Offline");
                 document.getElementById('inf-launch-btn').innerText = "Backend Connected 🟢";
                 document.getElementById('inf-launch-btn').style.color = "#4ade80";
-                window.comfyLaunching = false;
+                window.engineLaunching = false;
             } catch(e) {
                 document.getElementById('inf-launch-btn').innerText = "Launch Engine";
                 document.getElementById('inf-launch-btn').style.color = "#cbd5e1";
@@ -5915,7 +5630,7 @@
                 // I-3 fix: Persistent guard prevents re-launch on tab switching.
                 // _engineAutoLaunched tracks per-engine so switching engines still auto-launches the new one.
                 if(!window._engineAutoLaunched) window._engineAutoLaunched = {};
-                if(!window.comfyLaunching && !window._engineAutoLaunched[engine]) {
+                if(!window.engineLaunching && !window._engineAutoLaunched[engine]) {
                     window._engineAutoLaunched[engine] = true;
                     launchActiveEngine();
                 }
@@ -6161,10 +5876,27 @@
                 btn.innerText = "Starting...";
                 btn.style.color = "#fbbf24";
                 
-                await fetch('/api/launch', {
+                // S-1: Check launch response for port conflicts / errors before polling
+                const launchRes = await fetch('/api/launch', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({package_id: appId}) // Package Manager expects package_id
+                    body: JSON.stringify({package_id: appId})
                 });
+                const launchData = await launchRes.json().catch(() => ({}));
+
+                if (!launchRes.ok || launchData.status === 'error') {
+                    const msg = launchData.message || 'Failed to launch engine';
+                    btn.innerText = launchData.port_conflict ? '\u26a0\ufe0f Port Conflict' : '\u274c Launch Failed';
+                    btn.style.color = '#ef4444';
+                    btn.onclick = launchActiveEngine;
+                    window.engineLaunching = false;
+                    showToast(`\ud83d\udeab ${msg}`);
+                    return;
+                }
+
+                // S-6: Store port for WebSocket connection
+                if (launchData.port && engine === 'comfyui') {
+                    window._comfyPort = launchData.port;
+                }
                 
                 let retries = 0;
                 const proxyMap = {
@@ -6189,22 +5921,39 @@
                         }
 
                         const data = await res.json().catch(()=>({}));
-                        if(data.error === "engine_crashed" && data.repair_available) {
+                        if(data.error === "engine_crashed") {
                             clearInterval(poll);
-                            btn.innerHTML = `Repair 🛠️ <span style="font-size:0.6rem">(${data.missing_module || 'Error'})</span>`;
-                            btn.style.color = "#ef4444";
-                            btn.onclick = async () => {
-                                btn.innerText = "Repairing...";
-                                btn.style.color = "#fbbf24";
-                                btn.onclick = launchActiveEngine;
-                                await fetch('/api/repair_dependency', {
-                                    method: 'POST', 
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({package_id: appId})
-                                });
-                                setTimeout(() => { window.engineLaunching = false; launchActiveEngine(); }, 3000);
-                            };
                             window.engineLaunching = false;
+
+                            // S-2: Handle expanded crash types from BUG-4
+                            if (data.repair_available) {
+                                // Missing module — offer repair button
+                                btn.innerHTML = `Repair 🛠️ <span style="font-size:0.6rem">(${data.detail || 'Missing dependency'})</span>`;
+                                btn.style.color = "#ef4444";
+                                btn.onclick = async () => {
+                                    btn.innerText = "Repairing...";
+                                    btn.style.color = "#fbbf24";
+                                    btn.onclick = launchActiveEngine;
+                                    await fetch('/api/repair_dependency', {
+                                        method: 'POST', 
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({package_id: appId})
+                                    });
+                                    setTimeout(() => { window.engineLaunching = false; launchActiveEngine(); }, 3000);
+                                };
+                            } else {
+                                // Non-repairable crash (CUDA OOM, port-in-use, etc.)
+                                const errorLabel = {
+                                    cuda_oom: '💥 GPU Out of Memory',
+                                    cuda_error: '💥 CUDA Error',
+                                    port_in_use: '⚠️ Port Conflict',
+                                    permission_error: '🔒 Permission Denied'
+                                }[data.error_type] || '❌ Engine Crashed';
+                                btn.innerText = `${errorLabel} — Click to Retry`;
+                                btn.style.color = '#ef4444';
+                                btn.onclick = launchActiveEngine;
+                                showToast(`${errorLabel}: ${data.message || 'Check engine logs.'}`);
+                            }
                             return;
                         }
                         
@@ -6232,8 +5981,55 @@
             }
         }
 
+        /* IS-11: Active generation AbortController for cancel support */
+        window._activeGenController = null;
+
+        async function cancelInference() {
+            // IS-11: Cancel in-flight generation + send ComfyUI /interrupt
+            if (window._activeGenController) {
+                window._activeGenController.abort();
+                window._activeGenController = null;
+            }
+            // Clear all ComfyUI polling intervals
+            if (window.comfyPollInterval) { clearInterval(window.comfyPollInterval); window.comfyPollInterval = null; }
+            if (window.comfyProgressInterval) { clearInterval(window.comfyProgressInterval); window.comfyProgressInterval = null; }
+
+            // Send /interrupt to ComfyUI to stop GPU work
+            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
+            if (engine === 'comfyui') {
+                try {
+                    await fetch('/api/comfy_proxy', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({endpoint: '/interrupt', payload: {}})
+                    });
+                } catch(e) { console.debug('[Cancel] ComfyUI interrupt failed:', e); }
+            }
+
+            // Reset UI
+            const btn = document.getElementById('inf-generate-btn');
+            const txt = document.getElementById('inf-generate-text');
+            const fill = document.getElementById('inf-progress-fill');
+            if (btn) btn.disabled = false;
+            if (txt) txt.innerText = 'Generate Image';
+            if (fill) { fill.style.width = '0%'; fill.classList.remove('progress-pulsing'); }
+            // Hide cancel, show generate
+            const cancelBtn = document.getElementById('inf-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (btn) btn.style.display = '';
+            // Hide progress bar
+            const bar = document.getElementById('gen-progress-bar');
+            const info = document.getElementById('gen-progress-info');
+            if (bar) bar.classList.remove('active');
+            if (info) { info.classList.remove('active'); info.textContent = ''; }
+            document.getElementById('inf-canvas-empty').innerText = 'Generation cancelled.';
+            showToast('🛑 Generation cancelled.');
+        }
+
         async function executeInference() {
-            const engine = document.getElementById('inf-engine').value;
+            // IS-01/IS-05: Use unified payload builder
+            const payload = buildGenerationPayload();
+            const engine = payload.engine;
             let endpoint = engine === 'comfyui' ? '/api/comfy_proxy' : `/api/${engine}_proxy`;
             
             const btn = document.getElementById('inf-generate-btn');
@@ -6242,86 +6038,21 @@
             
             // R-12: Prompt length validation — prevent engine timeouts from extreme inputs
             const _PROMPT_MAX = 10000;
-            const promptVal = document.getElementById('inf-prompt').value;
-            const negVal = document.getElementById('inf-negative').value;
-            if(promptVal.length > _PROMPT_MAX || negVal.length > _PROMPT_MAX) {
+            if(payload.prompt.length > _PROMPT_MAX || payload.negative_prompt.length > _PROMPT_MAX) {
                 showToast(`⚠️ Prompt exceeds ${_PROMPT_MAX} character limit. Please shorten it.`);
                 return;
             }
-            
-            // Build Universal Payload
-            const payload = {
-                engine: engine,
-                model_type: document.getElementById('inf-model-type').value,
-                prompt: document.getElementById('inf-prompt').value,
-                negative_prompt: document.getElementById('inf-negative').value,
-                seed: parseInt(document.getElementById('inf-seed').value),
-                steps: parseInt(document.getElementById('inf-steps').value),
-                cfg_scale: parseFloat(document.getElementById('inf-cfg').value),
-                width: parseInt(document.getElementById('inf-width').value),
-                height: parseInt(document.getElementById('inf-height').value),
-                sampler_name: document.getElementById('inf-sampler').value,
-                scheduler: document.getElementById('inf-scheduler').value,
-                override_settings: {
-                    sd_model_checkpoint: document.getElementById('inf-model').value
-                },
-                vae: document.getElementById('inf-vae').value,
-                refiner: document.getElementById('inf-refiner').value,
-                refiner_steps: parseInt(document.getElementById('inf-refiner-steps').value)
-            };
 
-            // Flux specific parameters
-            if(payload.model_type.includes('flux')) {
-                payload.flux_unet = document.getElementById('inf-flux-unet')?.value;
-                payload.flux_clip_l = document.getElementById('inf-flux-clip-l')?.value;
-                payload.flux_t5xxl = document.getElementById('inf-flux-t5xxl')?.value;
-                payload.flux_guidance = parseFloat(document.getElementById('inf-flux-guidance')?.value || 3.5);
-            }
-
-            // LoRAs
-            payload.loras = [];
-            document.querySelectorAll('#inf-lora-container > div').forEach(row => {
-                const lName = row.querySelector('.lora-select').value;
-                const lWeight = parseFloat(row.querySelector('.lora-weight').value);
-                if(lName && lName !== 'none') {
-                    payload.loras.push({ name: lName, weight: lWeight });
-                }
-            });
-
-            // Img2Img
-            if(window.comfyUploadedImg2Img) {
-                payload.init_image_name = window.comfyUploadedImg2Img;
-                payload.init_image_b64 = window.comfyUploadedImg2ImgB64;
-                payload.denoising_strength = parseFloat(document.getElementById('inf-img2img-denoise').value);
-            }
-
-            // Hires Fix
-            const doHires = document.getElementById('inf-hires-enable').checked;
-            if(doHires && !payload.init_image_name) {
-                payload.hires = {
-                    enable: true,
-                    factor: parseFloat(document.getElementById('inf-hires-factor').value),
-                    denoise: parseFloat(document.getElementById('inf-hires-denoise').value),
-                    steps: parseInt(document.getElementById('inf-hires-steps').value),
-                    upscaler: document.getElementById('inf-hires-upscaler').value
-                };
-            }
-
-            // ControlNet
-            const cnEnable = document.getElementById('inf-cn-enable')?.checked;
-            if(cnEnable && window.comfyUploadedCn) {
-                payload.controlnet = {
-                    enable: true,
-                    model: document.getElementById('inf-cn-model').value,
-                    strength: parseFloat(document.getElementById('inf-cn-strength').value),
-                    image: window.comfyUploadedCn,
-                    image_b64: window.comfyUploadedCnB64
-                };
-            }
+            // IS-11: Create AbortController for cancel support
+            const controller = new AbortController();
+            window._activeGenController = controller;
             
             fill.style.width = '0%';
             btn.disabled = true;
             txt.innerText = "Queueing...";
+            // IS-11: Show cancel button
+            const cancelBtn = document.getElementById('inf-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'inline-flex';
             document.getElementById('inf-canvas-img').style.display = 'none';
             document.getElementById('inf-canvas-empty').style.display = 'block';
             document.getElementById('inf-canvas-empty').innerText = "Waking Engine...";
@@ -6373,7 +6104,7 @@
                                 document.getElementById('inf-canvas-empty').style.display = 'none';
                             }
                         }
-                    } catch(e) {}
+                    } catch(e) { console.debug('[Progress] A1111/Forge poll error:', e); }
                 }, 1000);
             } else if (engine === 'fooocus') {
                 fill.style.width = '5%';
@@ -6390,7 +6121,8 @@
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({endpoint: '/api/generate', payload: payload})
+                    body: JSON.stringify({endpoint: '/api/generate', payload: payload}),
+                    signal: controller.signal  // IS-11: AbortController support
                 });
                 const data = await res.json();
                 
@@ -6410,53 +6142,73 @@
                     document.getElementById('inf-canvas-empty').innerText = "Generating your image...";
                     
                     // R-4: Dynamic WebSocket URL for LAN sharing support
-                    if(!window.comfyWS && activeEngine === 'comfyui') {
-                        try {
-                            const wsHost = window.location.hostname || '127.0.0.1';
-                            const wsPort = window._comfyPort || 8188;
-                            window.comfyWS = new WebSocket(`ws://${wsHost}:${wsPort}/ws`);
-                            window.comfyWS.onmessage = (event) => {
-                                if(typeof event.data === 'string') {
-                                    const msg = JSON.parse(event.data);
-                                    if(msg.type === 'progress') {
-                                        const pfill = document.getElementById('inf-progress-fill');
-                                        if(pfill && msg.data.max > 0) {
-                                            const pct = (msg.data.value / msg.data.max) * 100;
-                                            pfill.style.width = pct + '%';
-                                            pfill.classList.remove('progress-pulsing');
-                                            updateGenProgress(pct, `Step ${msg.data.value}/${msg.data.max}`);
-                                        }
-                                    }
-                                } else {
-                                    const reader = new FileReader();
-                                    reader.onload = () => {
-                                        const buffer = new Uint8Array(reader.result);
-                                        if(buffer.length > 8) {
-                                            const imgBlob = new Blob([buffer.slice(8)]);
-                                            const imgUrl = URL.createObjectURL(imgBlob);
-                                            const cimg = document.getElementById('inf-canvas-img');
-                                            if(cimg) {
-                                                cimg.src = imgUrl;
-                                                cimg.style.display = 'block';
-                                                document.getElementById('inf-canvas-empty').style.display = 'none';
+                    // IS-02 fix: was `activeEngine` (undefined) — now uses local `engine` variable
+                    // IS-12 fix: Read ComfyUI port from server status if available
+                    if(!window.comfyWS && engine === 'comfyui') {
+                        // S-3: WebSocket connection with auto-reconnect backoff
+                        function connectComfyWS(attempt) {
+                            if (attempt > 3) { console.warn('[ComfyUI WS] Max reconnect attempts reached.'); return; }
+                            try {
+                                const wsHost = window.location.hostname || '127.0.0.1';
+                                const wsPort = window._comfyPort || 8188;
+                                const ws = new WebSocket(`ws://${wsHost}:${wsPort}/ws`);
+                                ws.onopen = () => { console.log('[ComfyUI WS] Connected (attempt ' + attempt + ')'); };
+                                ws.onmessage = (event) => {
+                                    if(typeof event.data === 'string') {
+                                        try {
+                                            const msg = JSON.parse(event.data);
+                                            if(msg.type === 'progress') {
+                                                const pfill = document.getElementById('inf-progress-fill');
+                                                if(pfill && msg.data.max > 0) {
+                                                    const pct = (msg.data.value / msg.data.max) * 100;
+                                                    pfill.style.width = pct + '%';
+                                                    pfill.classList.remove('progress-pulsing');
+                                                    updateGenProgress(pct, `Step ${msg.data.value}/${msg.data.max}`);
+                                                }
                                             }
-                                        }
-                                    };
-                                    reader.readAsArrayBuffer(event.data);
-                                }
-                            };
-                            // R-2: Auto-reconnect on disconnect by nulling the reference
-                            window.comfyWS.onclose = () => {
-                                console.log('[ComfyUI WS] Connection closed. Will reconnect on next generation.');
-                                window.comfyWS = null;
-                            };
-                            window.comfyWS.onerror = (err) => {
-                                console.warn('[ComfyUI WS] Error:', err);
-                                window.comfyWS = null;
-                            };
-                        } catch(e) {
-                            console.warn('[ComfyUI WS] Failed to connect:', e);
+                                        } catch(parseErr) { console.debug('[ComfyUI WS] Parse error:', parseErr); }
+                                    } else {
+                                        const reader = new FileReader();
+                                        reader.onload = () => {
+                                            const buffer = new Uint8Array(reader.result);
+                                            if(buffer.length > 8) {
+                                                const imgBlob = new Blob([buffer.slice(8)]);
+                                                const imgUrl = URL.createObjectURL(imgBlob);
+                                                const cimg = document.getElementById('inf-canvas-img');
+                                                if(cimg) {
+                                                    // IS-04: Revoke previous blob URL to prevent memory leak
+                                                    if (cimg._lastBlobUrl) URL.revokeObjectURL(cimg._lastBlobUrl);
+                                                    cimg._lastBlobUrl = imgUrl;
+                                                    cimg.src = imgUrl;
+                                                    cimg.style.display = 'block';
+                                                    document.getElementById('inf-canvas-empty').style.display = 'none';
+                                                }
+                                            }
+                                        };
+                                        reader.readAsArrayBuffer(event.data);
+                                    }
+                                };
+                                // S-3: Auto-reconnect with exponential backoff during active generation
+                                ws.onclose = () => {
+                                    console.log('[ComfyUI WS] Connection closed.');
+                                    window.comfyWS = null;
+                                    // Only reconnect if generation is still in-flight
+                                    if (window.comfyPollInterval) {
+                                        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+                                        console.log(`[ComfyUI WS] Reconnecting in ${delay}ms (attempt ${attempt + 1})...`);
+                                        setTimeout(() => connectComfyWS(attempt + 1), delay);
+                                    }
+                                };
+                                ws.onerror = (err) => {
+                                    console.warn('[ComfyUI WS] Error:', err);
+                                    // onclose will fire after onerror — reconnect happens there
+                                };
+                                window.comfyWS = ws;
+                            } catch(e) {
+                                console.warn('[ComfyUI WS] Failed to connect:', e);
+                            }
                         }
+                        connectComfyWS(1);
                     }
                     
                     window.comfyProgressInterval = setInterval(() => {
@@ -6512,12 +6264,15 @@
                                         fill.style.width = '100%';
                                         fill.classList.remove('progress-pulsing');
                                         hideGenProgress();
+                                        // IS-11: Hide cancel button on completion
+                                        if (cancelBtn) cancelBtn.style.display = 'none';
+                                        window._activeGenController = null;
                                         setTimeout(() => fill.style.width = '0%', 800);
                                         break;
                                     }
                                 }
                             }
-                        } catch(e) {}
+                        } catch(e) { console.debug('[ComfyUI] History poll error:', e); }
                     }, 1500);
 
                 } else if(engine === 'a1111' || engine === 'forge') {
@@ -6534,6 +6289,8 @@
                     fill.style.width = '0%';
                     fill.classList.remove('progress-pulsing');
                     hideGenProgress();
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    window._activeGenController = null;
                 } else if(engine === 'fooocus') {
                     if(data.image) {
                         const canvasImg = document.getElementById('inf-canvas-img');
@@ -6547,8 +6304,11 @@
                     fill.style.width = '0%';
                     fill.classList.remove('progress-pulsing');
                     hideGenProgress();
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    window._activeGenController = null;
                 }
             } catch(e) {
+                if (e.name === 'AbortError') return;  // IS-11: User cancelled — cancelInference already cleaned up
                 if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
                 alert("Generation Failed: " + e.message + `\n\nIs ${engine} running?`);
                 btn.disabled = false;
@@ -6558,6 +6318,8 @@
                 hideGenProgress();
                 if(window.comfyPollInterval) clearInterval(window.comfyPollInterval);
                 if(window.comfyProgressInterval) clearInterval(window.comfyProgressInterval);
+                if (cancelBtn) cancelBtn.style.display = 'none';
+                window._activeGenController = null;
                 document.getElementById('inf-canvas-empty').innerText = "No Output";
             }
         }
@@ -6599,7 +6361,7 @@
                         </div>
                     `;
                 });
-            } catch(e) { }
+            } catch(e) { console.debug('[Downloads] Poll error:', e); }
         }
         
         async function checkSystemStatus() {
@@ -6821,7 +6583,6 @@
             const legend = document.getElementById('dash-donut-legend');
             if(!svg || !legend) return;
 
-
             const entries = Object.entries(distribution).filter(([k,v]) => v > 0);
             const total = entries.reduce((s, [,v]) => s + v, 0);
             if(total === 0) {
@@ -6906,41 +6667,10 @@
         let _batchPollInterval = null;
 
         function getInferencePayload() {
-            // Gather current inference parameters into a payload object
-            const payload = {
-                prompt: resolveWildcards(document.getElementById('inf-prompt')?.value || ''),
-                negative: resolveWildcards(document.getElementById('inf-negative')?.value || ''),
-                steps: parseInt(document.getElementById('inf-steps')?.value || '20'),
-                cfg: parseFloat(document.getElementById('inf-cfg')?.value || '7'),
-                width: parseInt(document.getElementById('inf-width')?.value || '512'),
-                height: parseInt(document.getElementById('inf-height')?.value || '512'),
-                seed: parseInt(document.getElementById('inf-seed')?.value || '-1'),
-                sampler: document.getElementById('inf-sampler')?.value || 'euler',
-                scheduler: document.getElementById('inf-scheduler')?.value || 'normal',
-                backend: document.getElementById('inf-engine')?.value || 'comfyui'
-            };
-            // Model
-            const modelSel = document.getElementById('inf-model');
-            if(modelSel) payload.model = modelSel.value;
-            // Sprint 12: Include inpainting mask if active
-            if (hasInpaintMask()) {
-                payload.mask_b64 = getInpaintMaskBase64();
-                // Also include the current canvas image as init_image for inpainting
-                const canvasImg = document.getElementById('inf-canvas-img');
-                if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none') {
-                    // Convert displayed image to base64
-                    const tmpCanvas = document.createElement('canvas');
-                    tmpCanvas.width = canvasImg.naturalWidth;
-                    tmpCanvas.height = canvasImg.naturalHeight;
-                    tmpCanvas.getContext('2d').drawImage(canvasImg, 0, 0);
-                    payload.init_image_b64 = tmpCanvas.toDataURL('image/png').split(',')[1];
-                }
-            }
-            // Sprint 12: Include regional prompting data if active
-            const regionData = getRegionData();
-            if (regionData) {
-                payload.regions = regionData;
-            }
+            // IS-05: Delegate to unified payload builder, then apply wildcard resolution
+            const payload = buildGenerationPayload();
+            payload.prompt = resolveWildcards(payload.prompt);
+            payload.negative_prompt = resolveWildcards(payload.negative_prompt || '');
             return payload;
         }
 
@@ -7020,6 +6750,37 @@
                 showToast('🎨 Batch job completed');
             } else if (data.status === 'failed') {
                 showToast('❌ Batch job failed: ' + (data.error || 'Unknown error'));
+            }
+
+            // IS-06: Update XYZ/Seed Explorer grid cell if this job belongs to an active session
+            if (window._xyzJobIds && data.id) {
+                const idx = window._xyzJobIds.indexOf(data.id);
+                if (idx !== -1 && window._xyzGridEl) {
+                    const cell = window._xyzGridEl.querySelector(`[data-xyz-idx="${idx}"]`);
+                    if (cell) {
+                        if (data.status === 'done') {
+                            cell.style.background = 'rgba(16, 185, 129, 0.15)';
+                            cell.style.borderColor = '#10b981';
+                            const label = cell.querySelector('.xyz-grid-label');
+                            if (label) label.textContent = '✅ ' + label.textContent;
+                        } else if (data.status === 'failed') {
+                            cell.style.background = 'rgba(239, 68, 68, 0.15)';
+                            cell.style.borderColor = '#ef4444';
+                            const label = cell.querySelector('.xyz-grid-label');
+                            if (label) label.textContent = '❌ ' + label.textContent;
+                        }
+                    }
+                    // Check if all jobs are complete
+                    const completedCount = window._xyzJobIds.filter((_, i) => {
+                        const c = window._xyzGridEl.querySelector(`[data-xyz-idx="${i}"]`);
+                        return c && (c.style.borderColor === 'rgb(16, 185, 129)' || c.style.borderColor === 'rgb(239, 68, 68)');
+                    }).length;
+                    if (completedCount >= window._xyzJobIds.length) {
+                        const statusEl = document.getElementById('xyz-status');
+                        if (statusEl) statusEl.textContent = '✅ All XYZ/Seed jobs completed!';
+                        window._xyzJobIds = null;
+                    }
+                }
             }
         };
 
@@ -7808,30 +7569,6 @@
             <pre id="term-output" style="flex:1; overflow-y:auto; color:#f8fafc; font-family:monospace; font-size:0.85rem; padding:10px; margin:0; white-space:pre-wrap; background:transparent; border:none; outline:none; scroll-behavior: smooth;"></pre>
         </div>
     </div>
-
-    <!-- Model Paths Configuration Modal -->
-    <div id="model-paths-modal" class="lightbox-overlay" style="display:none; align-items:center; justify-content:center; z-index:510;" onclick="if(event.target===this) closeModelPaths()">
-        <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 16px; width: 720px; max-height: 85vh; padding: 28px; box-shadow: 0 16px 64px rgba(0,0,0,0.7); display: flex; flex-direction: column; overflow: hidden;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0;">
-                <div>
-                    <h2 style="margin: 0; font-size: 1.3rem;">⚙️ Extra Model Paths</h2>
-                    <p id="mp-pkg-name" style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-muted);">Package</p>
-                </div>
-                <button onclick="closeModelPaths()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; padding: 4px 8px;">&times;</button>
-            </div>
-            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 16px; line-height: 1.5; flex-shrink: 0;">
-                Add external model directories so the engine can find models stored on other drives. Each section defines a source with a base path and category subdirectories.
-            </p>
-            <div id="mp-sections" style="flex: 1; overflow-y: auto; padding-right: 4px;"></div>
-            <div style="display: flex; gap: 10px; margin-top: 16px; flex-shrink: 0;">
-                <button onclick="addModelPathSection()" style="background: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">+ Add Source</button>
-                <div style="flex: 1;"></div>
-                <button onclick="closeModelPaths()" style="background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600;">Cancel</button>
-                <button onclick="saveModelPaths()" id="mp-save-btn" style="background: var(--primary); color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9rem;">Save & Restart</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Sprint 8: Command Palette -->
     <div id="command-palette" class="cmd-palette-overlay" onclick="if(event.target===this) closeCommandPalette()">
         <div class="cmd-palette">

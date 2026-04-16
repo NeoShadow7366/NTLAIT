@@ -168,7 +168,34 @@ def _run_import(import_id: str, src_path: str, category: str, root_dir: str, api
         # 1. Copy file
         _update("copying", f"Copying {filename} to vault...", progress=10)
         if os.path.abspath(src_path) != os.path.abspath(dest_path):
+            # M-4 fix: Pre-copy disk space check
+            try:
+                file_size = os.path.getsize(src_path)
+                free_space = shutil.disk_usage(vault_dir).free
+                # Require 10% headroom above file size
+                if free_space < file_size * 1.1:
+                    free_gb = free_space / (1024 ** 3)
+                    need_gb = file_size / (1024 ** 3)
+                    _update("error", f"Insufficient disk space. Need {need_gb:.1f}GB, only {free_gb:.1f}GB free.")
+                    return
+            except OSError:
+                pass  # Non-blocking — allow import to proceed if disk check fails
+            
             shutil.copy2(src_path, dest_path)
+            
+            # M-3 fix: Post-copy size verification
+            try:
+                src_size = os.path.getsize(src_path)
+                dst_size = os.path.getsize(dest_path)
+                if src_size != dst_size:
+                    _update("error", f"Copy verification failed: size mismatch ({src_size} vs {dst_size}). Partial file removed.")
+                    try:
+                        os.remove(dest_path)
+                    except OSError:
+                        pass
+                    return
+            except OSError:
+                pass  # Non-blocking
         
         # 2. Hash
         _update("hashing", "Computing SHA-256 hash...", progress=30)
@@ -179,7 +206,15 @@ def _run_import(import_id: str, src_path: str, category: str, root_dir: str, api
 
         # 3. Register in DB
         _update("registering", "Registering in vault database...", progress=50)
-        db = MetadataDB(os.path.join(root_dir, ".backend", "metadata.sqlite"))
+        # P2-5 fix: Use server's singleton DB when available to avoid lock contention
+        try:
+            server_mod = sys.modules.get('server', None)
+            if server_mod and hasattr(server_mod, '_get_db'):
+                db = server_mod._get_db()
+            else:
+                db = MetadataDB(os.path.join(root_dir, ".backend", "metadata.sqlite"))
+        except Exception:
+            db = MetadataDB(os.path.join(root_dir, ".backend", "metadata.sqlite"))
         db.insert_or_update_model(filename=filename, vault_category=category, file_hash=file_hash)
 
         # 4. Fetch CivitAI metadata by hash

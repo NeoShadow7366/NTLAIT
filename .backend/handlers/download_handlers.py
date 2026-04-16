@@ -156,7 +156,30 @@ class DownloadHandlersMixin:
             try:
                 os.remove(filepath)
                 db = _get_db()
-                db.remove_model_by_filename(filename)
+                # P3-3 fix: Use get_model_by_filename → remove_model_by_id for cascade cleanup
+                # (embeddings + user_tags), instead of remove_model_by_filename which leaves orphans
+                model = db.get_model_by_filename(filename)
+                if model:
+                    db.remove_model_by_id(model["id"])
+                    # P3-3: Also clean orphaned thumbnail
+                    file_hash = model.get("file_hash")
+                    if file_hash:
+                        thumb_dir = os.path.join(self.root_dir, ".backend", "cache", "thumbnails")
+                        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+                            tp = os.path.join(thumb_dir, f"{file_hash}.{ext}")
+                            if os.path.exists(tp):
+                                try:
+                                    os.remove(tp)
+                                except OSError:
+                                    pass
+                    # Invalidate embedding cache
+                    try:
+                        engine = self._get_embedding_engine()
+                        engine._invalidate_cache()
+                    except Exception:
+                        pass
+                else:
+                    db.remove_model_by_filename(filename, vault_category=category)
                 self.send_json_response({"status": "success", "message": "Model deleted"})
             except Exception as e:
                 self.send_json_response({"status": "error", "message": str(e)}, 500)

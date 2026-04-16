@@ -86,6 +86,21 @@ class Downloader:
                 total_size = int(response.info().get('Content-Length', 0))
                 self.update_job(job_id, {"status": "downloading", "total": total_size})
                 
+                # P2-3 fix: Disk space pre-check before downloading multi-GB models
+                if total_size > 0:
+                    try:
+                        import shutil
+                        free_space = shutil.disk_usage(dest_folder).free
+                        if free_space < total_size * 1.1:
+                            free_gb = free_space / (1024 ** 3)
+                            need_gb = total_size / (1024 ** 3)
+                            msg = f"Insufficient disk space. Need {need_gb:.1f}GB, only {free_gb:.1f}GB free."
+                            logging.error(msg)
+                            self.update_job(job_id, {"status": "error", "message": msg, "completed_at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                            return
+                    except OSError:
+                        pass  # Non-blocking
+                
                 downloaded = 0
                 chunk_size = 8192 * 4  # 32KB chunks
                 

@@ -49,8 +49,8 @@ class VaultHandlersMixin:
             logging.info(f"Performing semantic search for: {q}")
 
             db = _get_db()
-            from embedding_engine import EmbeddingEngine
-            engine = EmbeddingEngine(self.db_path)
+            # L-2 fix: Singleton EmbeddingEngine to avoid reinstantiating 80MB model per request
+            engine = self._get_embedding_engine()
             results = engine.search(q, top_k=limit)
 
             models = []
@@ -87,6 +87,12 @@ class VaultHandlersMixin:
     def handle_add_tag(self, data):
         hash_val = data.get("file_hash")
         tag = data.get("tag")
+        # P3-2 fix: Frontend sends filename+category, resolve hash from DB
+        if not hash_val and data.get("filename"):
+            from server import _get_db as _gdb
+            m = _gdb().get_model_by_filename(data["filename"])
+            if m:
+                hash_val = m.get("file_hash")
         if not hash_val or not tag:
             self.send_json_response({"status": "error", "message": "Missing hash or tag"}, 400)
             return
@@ -101,6 +107,12 @@ class VaultHandlersMixin:
     def handle_remove_tag(self, data):
         hash_val = data.get("file_hash")
         tag = data.get("tag")
+        # P3-2 fix: Frontend sends filename+category, resolve hash from DB
+        if not hash_val and data.get("filename"):
+            from server import _get_db as _gdb
+            m = _gdb().get_model_by_filename(data["filename"])
+            if m:
+                hash_val = m.get("file_hash")
         if not hash_val or not tag:
             self.send_json_response({"status": "error", "message": "Missing hash or tag"}, 400)
             return
@@ -150,9 +162,12 @@ class VaultHandlersMixin:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
     def handle_vault_health_check(self, data):
-        """Checks vault symlinks/junctions in installed packages for broken targets."""
+        """Checks vault symlinks/junctions in installed packages for broken targets.
+        H-2 fix: Reads manifest.json symlink maps instead of guessing by directory name."""
         from server import _get_db
+        from symlink_manager import create_safe_directory_link
         broken_links = 0
+        repaired_links = 0
         packages_dir = os.path.join(self.root_dir, "packages")
         vault_dir = os.path.join(self.root_dir, "Global_Vault")
 
@@ -160,43 +175,64 @@ class VaultHandlersMixin:
             self.send_json_response({"status": "success", "message": "No packages installed."})
             return
 
-        # S2-9: Depth-limited walk to prevent hangs on recursive junction cycles
-        _MAX_DEPTH = 10
         for pkg_name in os.listdir(packages_dir):
             pkg_path = os.path.join(packages_dir, pkg_name)
-            if not os.path.isdir(pkg_path):
+            manifest_path = os.path.join(pkg_path, "manifest.json")
+            if not os.path.isdir(pkg_path) or not os.path.exists(manifest_path):
                 continue
-            pkg_depth = pkg_path.count(os.sep)
-            for root, dirs, _ in os.walk(pkg_path):
-                current_depth = root.count(os.sep) - pkg_depth
-                if current_depth >= _MAX_DEPTH:
-                    dirs.clear()  # Stop descending
-                    continue
-                for d in dirs:
-                    full = os.path.join(root, d)
-                    if os.path.islink(full) or (os.name == 'nt' and os.path.isdir(full)):
-                        try:
-                            target = os.path.realpath(full)
-                            if not os.path.exists(target):
-                                broken_links += 1
-                                # Attempt repair: re-point to vault equivalent
-                                vault_equiv = os.path.join(vault_dir, d)
-                                if os.path.exists(vault_equiv):
-                                    try:
-                                        from symlink_manager import create_safe_directory_link
-                                        os.rmdir(full)
-                                        create_safe_directory_link(vault_equiv, full)
-                                    except Exception:
-                                        pass
-                        except Exception:
-                            pass
 
-        self.send_json_response({"status": "success", "message": f"Repaired {broken_links} broken symlinks/junctions in packages."})
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            symlinks = manifest.get("model_symlinks", {})
+            app_path = os.path.join(pkg_path, "app")
+
+            for vault_src, app_target in symlinks.items():
+                source_path = os.path.join(vault_dir, vault_src)
+                target_path = os.path.join(app_path, app_target)
+
+                # Check if the link/junction exists and its target is valid
+                if os.path.exists(target_path) or os.path.islink(target_path):
+                    try:
+                        real_target = os.path.realpath(target_path)
+                        if not os.path.exists(real_target):
+                            broken_links += 1
+                            # Attempt repair: re-create junction to vault
+                            if os.path.exists(source_path):
+                                try:
+                                    if os.path.islink(target_path):
+                                        os.unlink(target_path)
+                                    else:
+                                        os.rmdir(target_path)
+                                    create_safe_directory_link(source_path, target_path)
+                                    repaired_links += 1
+                                    logging.info(f"Repaired broken link: {target_path} → {source_path}")
+                                except Exception as e:
+                                    logging.warning(f"Failed to repair {target_path}: {e}")
+                    except Exception:
+                        pass
+                elif os.path.exists(source_path):
+                    # Link is completely missing — recreate
+                    try:
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        create_safe_directory_link(source_path, target_path)
+                        repaired_links += 1
+                        logging.info(f"Recreated missing link: {target_path} → {source_path}")
+                    except Exception as e:
+                        logging.warning(f"Failed to create {target_path}: {e}")
+
+        self.send_json_response({
+            "status": "success",
+            "message": f"Found {broken_links} broken link(s). Repaired {repaired_links}."
+        })
 
     def handle_vault_repair(self, data):
         """POST /api/vault/repair — re-fetch metadata + thumbnails for a model.
         Accepts file_hash directly, or falls back to filename-based lookup."""
-        from server import _get_db, _get_settings
+        from server import _get_db
         file_hash = data.get("file_hash")
         filename = data.get("filename")
 
@@ -213,11 +249,13 @@ class VaultHandlersMixin:
 
         try:
             from civitai_client import CivitaiClient
-            settings = _get_settings()
-            api_key = settings.get("civitai_api_key", "")
-            client = CivitaiClient(db, api_key=api_key, root_dir=self.root_dir)
-            client.fetch_and_store(file_hash)
-            self.send_json_response({"status": "success", "message": f"Metadata refreshed for {file_hash[:12]}..."})
+            # C-3 fix: Use correct CivitaiClient constructor signature and method
+            client = CivitaiClient(self.root_dir, db=db)
+            success = client.repair_model_metadata(file_hash)
+            if success:
+                self.send_json_response({"status": "success", "message": f"Metadata refreshed for {file_hash[:12]}..."})
+            else:
+                self.send_json_response({"status": "error", "message": f"Could not fetch metadata for {file_hash[:12]}"}, 404)
         except Exception as e:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
@@ -225,6 +263,7 @@ class VaultHandlersMixin:
         try:
             from server import _get_db
             from import_engine import start_import
+            from metadata_db import MODEL_EXTENSIONS
             vault_dir = os.path.join(self.root_dir, "Global_Vault")
             db = _get_db()
             known_filenames = db.get_all_filenames()
@@ -232,7 +271,8 @@ class VaultHandlersMixin:
             api_key = data.get("api_key", "")
             for root, _, files in os.walk(vault_dir):
                 for f in files:
-                    if any(f.lower().endswith(x) for x in ['.safetensors', '.ckpt', '.pt', '.bin']):
+                    # L-4 fix: Use shared MODEL_EXTENSIONS constant
+                    if any(f.lower().endswith(ext) for ext in MODEL_EXTENSIONS):
                         if f not in known_filenames:
                             f_path = os.path.join(root, f)
                             category = os.path.basename(root)
@@ -317,8 +357,9 @@ class VaultHandlersMixin:
             return
         try:
             db = _get_db()
-            imported = db.import_models_metadata(manifest)
-            self.send_json_response({"status": "success", "imported": imported})
+            result = db.import_models_metadata(manifest)
+            # P4-2 fix: Unpack dict so frontend gets flat {imported:N, skipped:N}
+            self.send_json_response({"status": "success", **result})
         except Exception as e:
             self.send_json_response({"status": "error", "message": str(e)}, 500)
 
@@ -365,7 +406,29 @@ class VaultHandlersMixin:
         if filenames_to_remove:
             try:
                 db = _get_db()
+                # P4-3: Collect file hashes before deletion for thumbnail cleanup
+                hashes_to_clean = []
+                for fn in filenames_to_remove:
+                    model = db.get_model_by_filename(fn)
+                    if model and model.get("file_hash"):
+                        hashes_to_clean.append(model["file_hash"])
                 db.remove_models_by_filenames(filenames_to_remove)
+                # P4-3: Clean orphaned thumbnails
+                thumb_dir = os.path.join(self.root_dir, ".backend", "cache", "thumbnails")
+                for fh in hashes_to_clean:
+                    for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+                        tp = os.path.join(thumb_dir, f"{fh}.{ext}")
+                        if os.path.exists(tp):
+                            try:
+                                os.remove(tp)
+                            except OSError:
+                                pass
+                # P2-6: Invalidate embedding cache so deleted models vanish from search
+                try:
+                    engine = self._get_embedding_engine()
+                    engine._invalidate_cache()
+                except Exception:
+                    pass
             except Exception as e:
                 logging.error(f"DB cleanup after bulk delete failed: {e}")
 
@@ -456,6 +519,18 @@ class VaultHandlersMixin:
         if server_mod:
             server_mod._vault_crawler = crawler
         return crawler
+
+    def _get_embedding_engine(self):
+        """Get or create the shared EmbeddingEngine instance (L-2 fix).
+        Avoids reinstantiating the 80MB sentence-transformer model per search request."""
+        server_mod = sys.modules.get('server', None)
+        if server_mod and hasattr(server_mod, '_embedding_engine'):
+            return server_mod._embedding_engine
+        from embedding_engine import EmbeddingEngine
+        engine = EmbeddingEngine(self.db_path)
+        if server_mod:
+            server_mod._embedding_engine = engine
+        return engine
 
     def handle_scan_external(self, data):
         """POST /api/vault/scan_external — Discover models from external paths.

@@ -6,6 +6,9 @@ import threading
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
+# Shared constant: recognized model file extensions (used by crawler, import, handlers)
+MODEL_EXTENSIONS = {".safetensors", ".pt", ".ckpt", ".bin", ".sft"}
+
 class MetadataDB:
     """SQLite-backed metadata store with persistent connection.
     
@@ -266,6 +269,14 @@ class MetadataDB:
 
         return dict(row) if row else None
 
+    def get_model_by_id(self, model_id: int):
+        """Look up a model by its database ID. Returns dict or None."""
+        conn = self._conn
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM models WHERE id = ?', (model_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
     def get_all_filenames(self):
         """Returns a set of all tracked filenames to allow fast skips during crawling."""
         conn = self._conn
@@ -274,6 +285,26 @@ class MetadataDB:
         rows = cursor.fetchall()
 
         return set(row[0] for row in rows)
+
+    def get_filenames_by_source(self, source_path: str = 'Global_Vault') -> set:
+        """Returns a set of (filename, vault_category) tuples for a specific source.
+        Used by the crawler to avoid filename collisions across categories."""
+        conn = self._conn
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT filename, vault_category FROM models WHERE source_path = ?',
+            (source_path,))
+        return set((row[0], row[1]) for row in cursor.fetchall())
+
+    def get_vault_models_for_pruning(self, source_path: str = 'Global_Vault') -> list:
+        """Returns id, filename, vault_category for all models from a given source.
+        Used by VaultCrawler.prune_stale_models() to verify files still exist."""
+        conn = self._conn
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, filename, vault_category, file_hash FROM models WHERE source_path = ?',
+            (source_path,))
+        return [dict(row) for row in cursor.fetchall()]
 
     def get_unpopulated_models(self):
         """Returns models where metadata_json is strictly NULL."""
@@ -484,7 +515,9 @@ class MetadataDB:
     # ── Bulk Vault Operations ───────────────────────────────────────
 
     def remove_models_by_filenames(self, filenames: list) -> int:
-        """Batch-delete models by filename within a single transaction. Returns count deleted."""
+        """Batch-delete models by filename within a single transaction.
+        P2-4 fix: Also cascade-deletes associated embeddings and user_tags.
+        Returns count of models deleted."""
         if not filenames:
             return 0
         with self._write_lock:
@@ -493,19 +526,77 @@ class MetadataDB:
             deleted = 0
             try:
                 for fn in filenames:
+                    # Fetch hashes before deleting so we can cascade-clean
+                    cursor.execute('SELECT file_hash FROM models WHERE filename = ?', (fn,))
+                    hashes = [row[0] for row in cursor.fetchall() if row[0]]
                     cursor.execute('DELETE FROM models WHERE filename = ?', (fn,))
                     deleted += cursor.rowcount
+                    # Cascade: clean up embeddings and user_tags
+                    for fh in hashes:
+                        cursor.execute('DELETE FROM embeddings WHERE file_hash = ?', (fh,))
+                        cursor.execute('DELETE FROM user_tags WHERE file_hash = ?', (fh,))
                 conn.commit()
             except Exception:
                 conn.rollback()
                 raise
             return deleted
 
-    def remove_model_by_filename(self, filename: str) -> None:
-        """Removes a single model entry by filename."""
+    def remove_model_by_filename(self, filename: str, vault_category: str = None) -> None:
+        """Removes a single model entry by filename.
+        If vault_category is provided, only delete the matching (filename, category) row
+        to prevent accidental cross-category deletions when filenames collide.
+        P4-1 fix: Now cascade-deletes associated embeddings and user_tags."""
         with self._write_lock:
             conn = self._conn
-            conn.execute('DELETE FROM models WHERE filename = ?', (filename,))
+            cursor = conn.cursor()
+            # Fetch hashes before deleting for cascade cleanup
+            if vault_category:
+                cursor.execute(
+                    'SELECT file_hash FROM models WHERE filename = ? AND vault_category = ?',
+                    (filename, vault_category))
+            else:
+                cursor.execute('SELECT file_hash FROM models WHERE filename = ?', (filename,))
+            hashes = [row[0] for row in cursor.fetchall() if row[0]]
+            # Delete the model rows
+            if vault_category:
+                cursor.execute(
+                    'DELETE FROM models WHERE filename = ? AND vault_category = ?',
+                    (filename, vault_category))
+            else:
+                cursor.execute('DELETE FROM models WHERE filename = ?', (filename,))
+            # Cascade: clean up embeddings and user_tags
+            for fh in hashes:
+                cursor.execute('DELETE FROM embeddings WHERE file_hash = ?', (fh,))
+                cursor.execute('DELETE FROM user_tags WHERE file_hash = ?', (fh,))
+            conn.commit()
+
+    def remove_model_by_id(self, model_id: int) -> None:
+        """Removes a single model entry by its database ID.
+        Also cleans up associated embeddings and user_tags."""
+        with self._write_lock:
+            conn = self._conn
+            cursor = conn.cursor()
+            # Get the hash first for cascade cleanup
+            cursor.execute('SELECT file_hash FROM models WHERE id = ?', (model_id,))
+            row = cursor.fetchone()
+            file_hash = row[0] if row else None
+            # Delete the model
+            cursor.execute('DELETE FROM models WHERE id = ?', (model_id,))
+            # Cascade: clean up related embedding and user_tags
+            if file_hash:
+                cursor.execute('DELETE FROM embeddings WHERE file_hash = ?', (file_hash,))
+                cursor.execute('DELETE FROM user_tags WHERE file_hash = ?', (file_hash,))
+            conn.commit()
+
+    def update_model_hash(self, model_id: int, file_hash: str) -> None:
+        """Set the SHA-256 hash on an existing model row.
+        Used by VaultCrawler.hash_library() instead of raw cursor access."""
+        with self._write_lock:
+            conn = self._conn
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE models SET file_hash = ?, last_scanned = CURRENT_TIMESTAMP WHERE id = ?',
+                (file_hash, model_id))
             conn.commit()
 
 

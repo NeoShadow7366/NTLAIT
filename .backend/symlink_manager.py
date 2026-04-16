@@ -5,6 +5,35 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+# M-1 fix: NTFS junction detection via ctypes
+# os.path.islink() returns False for NTFS directory junctions on Windows,
+# even though mklink /J creates them. We need ctypes to check the reparse point flag.
+def _is_junction_or_symlink(path: str) -> bool:
+    """Detect whether a path is a symlink OR an NTFS directory junction.
+    On UNIX, delegates to os.path.islink(). On Windows, checks the
+    FILE_ATTRIBUTE_REPARSE_POINT flag via ctypes (catches both symlinks and junctions)."""
+    if os.path.islink(path):
+        return True
+    if os.name == 'nt':
+        try:
+            import ctypes
+            _FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+            if attrs != -1 and bool(attrs & _FILE_ATTRIBUTE_REPARSE_POINT):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _get_junction_target(path: str) -> str:
+    """Resolve the target of a junction/symlink. Returns the real path or None."""
+    try:
+        return os.path.realpath(path)
+    except (OSError, ValueError):
+        return None
+
+
 def create_safe_directory_link(source_dir: str, target_link: str) -> bool:
     """
     Creates a cross-platform link for directories.
@@ -18,14 +47,27 @@ def create_safe_directory_link(source_dir: str, target_link: str) -> bool:
     source_dir = os.path.abspath(source_dir)
     target_link = os.path.abspath(target_link)
 
-    # 1. Conflict Prevention
-    if os.path.exists(target_link) or os.path.islink(target_link):
-        if os.path.islink(target_link):
-            if os.readlink(target_link) == source_dir:
-                return True # Already linked correctly
-            os.unlink(target_link) # Safe remove if incorrect
+    # 1. Conflict Prevention (M-1 fix: properly detects NTFS junctions)
+    if os.path.exists(target_link) or os.path.islink(target_link) or _is_junction_or_symlink(target_link):
+        if _is_junction_or_symlink(target_link):
+            # It's a junction or symlink — check if it already points to the right place
+            current_target = _get_junction_target(target_link)
+            if current_target and os.path.normcase(os.path.normpath(current_target)) == os.path.normcase(os.path.normpath(source_dir)):
+                return True  # Already linked correctly
+            # Wrong target — remove and re-create
+            try:
+                os.unlink(target_link)
+                logging.info(f"Removed stale junction/symlink at {target_link}")
+            except OSError:
+                # os.unlink may fail on junctions; try rmdir
+                try:
+                    os.rmdir(target_link)
+                    logging.info(f"Removed stale junction via rmdir at {target_link}")
+                except Exception as e:
+                    logging.error(f"Cannot remove stale link at {target_link}: {e}")
+                    return False
         elif os.path.isdir(target_link):
-            # Safety: only remove empty real directories to avoid data loss
+            # Real directory — only remove if empty to avoid data loss
             try:
                 if not os.listdir(target_link):
                     os.rmdir(target_link)

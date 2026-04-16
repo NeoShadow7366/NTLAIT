@@ -5,7 +5,7 @@ import logging
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from metadata_db import MetadataDB
+from metadata_db import MetadataDB, MODEL_EXTENSIONS
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -28,8 +28,8 @@ class VaultCrawler:
         self.db_path = os.path.join(self.root_dir, ".backend", "metadata.sqlite")
         self.db = db or MetadataDB(self.db_path)
         
-        # Extensions we care about tracking
-        self.valid_extensions = {".safetensors", ".pt", ".ckpt", ".bin", ".sft"}
+        # Extensions we care about tracking (shared constant)
+        self.valid_extensions = MODEL_EXTENSIONS
         
         # Cancellation support
         self.cancel_event = threading.Event()
@@ -109,18 +109,24 @@ class VaultCrawler:
             logging.warning("Vault directory missing; nothing to crawl.")
             return
 
-        tracked_files = self.db.get_all_filenames()
+        # C-2 fix: Use (filename, category) tuples to prevent cross-category collisions
+        tracked_pairs = self.db.get_filenames_by_source('Global_Vault')
         files_to_hash = []
         
         for root, _, files in os.walk(self.vault_dir):
             if self.cancel_event.is_set():
                 return
             for file in files:
-                if file not in tracked_files and self._is_model_file(file):
-                    files_to_hash.append((root, file))
+                if self._is_model_file(file):
+                    rel_path = os.path.relpath(os.path.join(root, file), self.vault_dir)
+                    category = rel_path.split(os.sep)[0] if os.sep in rel_path else "misc"
+                    if (file, category) not in tracked_pairs:
+                        files_to_hash.append((root, file))
         
         if not files_to_hash:
             logging.info("Vault Crawl Complete — no new files.")
+            # Still prune stale records even when no new files found
+            self.prune_stale_models()
             return
         
         logging.info(f"Found {len(files_to_hash)} new files to index.")
@@ -161,6 +167,9 @@ class VaultCrawler:
         self._update_vault_size_cache()
         self.scan_progress["active"] = False
         logging.info(f"Vault Crawl Complete. Indexed {len(hash_results)} new files.")
+        
+        # C-1 fix: Clean up DB records for files that no longer exist on disk
+        self.prune_stale_models()
 
     def _hash_single_vault_file(self, root: str, filename: str):
         """Hash a single vault file. Returns (filename, category, hash) or None."""
@@ -313,14 +322,7 @@ class VaultCrawler:
             
             if file_hash and not self.cancel_event.is_set():
                 try:
-                    # Update: set the hash on the existing row
-                    with self.db._write_lock:
-                        conn = self.db._conn
-                        cursor = conn.cursor()
-                        cursor.execute(
-                            'UPDATE models SET file_hash = ?, last_scanned = CURRENT_TIMESTAMP WHERE id = ?',
-                            (file_hash, model["id"]))
-                        conn.commit()
+                    self.db.update_model_hash(model["id"], file_hash)
                     hashed_count += 1
                     logging.info(f"Hashed {filename} [{file_hash[:8]}]")
                 except Exception as e:
@@ -333,14 +335,11 @@ class VaultCrawler:
 
     def hash_single_model(self, model_id: int) -> dict:
         """Hash a single model by its database ID."""
-        conn = self.db._conn
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM models WHERE id = ?', (model_id,))
-        row = cursor.fetchone()
-        if not row:
+        # P2-1 fix: Use proper MetadataDB API instead of raw cursor access
+        model = self.db.get_model_by_id(model_id)
+        if not model:
             return {"status": "error", "message": "Model not found"}
         
-        model = dict(row)
         if model.get("file_hash"):
             return {"status": "already_hashed", "hash": model["file_hash"]}
         
@@ -357,13 +356,7 @@ class VaultCrawler:
         if not file_hash:
             return {"status": "error", "message": "Hash computation failed"}
         
-        with self.db._write_lock:
-            conn = self.db._conn
-            cursor = conn.cursor()
-            cursor.execute(
-                'UPDATE models SET file_hash = ?, last_scanned = CURRENT_TIMESTAMP WHERE id = ?',
-                (file_hash, model_id))
-            conn.commit()
+        self.db.update_model_hash(model_id, file_hash)
         
         return {"status": "success", "hash": file_hash}
 
@@ -402,8 +395,82 @@ class VaultCrawler:
         logging.info("Scan cancellation requested.")
 
     # ══════════════════════════════════════════════════════
+    #  STALE MODEL PRUNING (C-1 fix)
+    # ══════════════════════════════════════════════════════
+
+    def prune_stale_models(self):
+        """Remove DB records for Global_Vault models whose files no longer exist on disk.
+        
+        Uses Option A: full removal including metadata, embeddings, and user_tags.
+        Only prunes models with source_path='Global_Vault' — external sources are not touched.
+        """
+        if not os.path.exists(self.vault_dir):
+            return
+        
+        models = self.db.get_vault_models_for_pruning('Global_Vault')
+        if not models:
+            return
+        
+        pruned_count = 0
+        for model in models:
+            if self.cancel_event.is_set():
+                break
+            
+            filename = model["filename"]
+            category = model["vault_category"]
+            expected_path = os.path.join(self.vault_dir, category, filename)
+            
+            # Also check recursively in case file is in a subdirectory
+            if not os.path.exists(expected_path):
+                # Double-check: walk the category dir for nested files
+                cat_dir = os.path.join(self.vault_dir, category)
+                found = False
+                if os.path.isdir(cat_dir):
+                    for root, _, files in os.walk(cat_dir):
+                        if filename in files:
+                            found = True
+                            break
+                
+                if not found:
+                    try:
+                        # P2-7: Also clean up orphaned thumbnail files
+                        file_hash = model.get("file_hash")
+                        if file_hash:
+                            thumb_dir = os.path.join(self.root_dir, ".backend", "cache", "thumbnails")
+                            if os.path.isdir(thumb_dir):
+                                for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+                                    thumb_path = os.path.join(thumb_dir, f"{file_hash}.{ext}")
+                                    if os.path.exists(thumb_path):
+                                        try:
+                                            os.remove(thumb_path)
+                                            logging.info(f"Removed orphaned thumbnail: {file_hash}.{ext}")
+                                        except OSError:
+                                            pass
+                        self.db.remove_model_by_id(model["id"])
+                        pruned_count += 1
+                        logging.info(f"Pruned stale model: {filename} (category: {category})")
+                    except Exception as e:
+                        logging.error(f"Failed to prune {filename}: {e}")
+        
+        if pruned_count > 0:
+            logging.info(f"Pruned {pruned_count} stale model record(s) from database.")
+            # P2-6: Invalidate embedding cache after pruning
+            self._invalidate_embedding_cache()
+
+    # ══════════════════════════════════════════════════════
     #  UTILITIES
     # ══════════════════════════════════════════════════════
+
+    def _invalidate_embedding_cache(self):
+        """P2-6: Signal the EmbeddingEngine to discard its in-memory cache.
+        Called after pruning or deletion so stale vectors don't appear in search."""
+        try:
+            server_mod = sys.modules.get('server', None)
+            if server_mod and hasattr(server_mod, '_embedding_engine'):
+                server_mod._embedding_engine._invalidate_cache()
+                logging.info("Embedding cache invalidated after model changes.")
+        except Exception:
+            pass  # Non-critical
 
     def _update_vault_size_cache(self):
         """Update the shared vault size cache for the dashboard."""

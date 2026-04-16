@@ -17,10 +17,18 @@ if BACKEND_DIR not in sys.path:
 from metadata_db import MetadataDB
 
 db_path = os.path.join(BACKEND_DIR, 'metadata.sqlite')
-db = MetadataDB(db_path)
+_db = None
+
+def _get_db():
+    """Lazy DB initialization — avoids creating a connection at import time."""
+    global _db
+    if _db is None:
+        _db = MetadataDB(db_path)
+    return _db
 
 def check_for_updates():
     logging.info("Checking for model updates via CivitAI API...")
+    db = _get_db()
     models = db.get_models_for_update_check()
     
     # Optional: fetch user's CivitAI API key if available
@@ -94,4 +102,15 @@ def check_for_updates():
     logging.info(f"Update check complete. {updates_found} updates found.")
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root_dir", required=False, help="Project root directory")
+    args = parser.parse_args()
+    # P3-5 fix: Override paths if --root_dir is provided by the spawning handler
+    if args.root_dir:
+        global _db
+        _backend = os.path.join(args.root_dir, ".backend")
+        if _backend not in sys.path:
+            sys.path.insert(0, _backend)
+        _db = MetadataDB(os.path.join(_backend, "metadata.sqlite"))
     check_for_updates()

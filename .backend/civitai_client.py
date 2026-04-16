@@ -45,9 +45,17 @@ class CivitaiClient:
     def download_thumbnail(self, image_url: str, file_hash: str, force: bool = False) -> str:
         if not image_url:
             return None
-            
-        ext = image_url.split(".")[-1].split("?")[0]
-        if len(ext) > 4 or not ext:
+        
+        # M-6 fix: Proper URL extension parsing with allowlist validation
+        _VALID_THUMB_EXTS = {"jpg", "jpeg", "png", "webp", "gif"}
+        try:
+            from urllib.parse import urlparse as _urlparse
+            url_path = _urlparse(image_url).path
+            _, raw_ext = os.path.splitext(url_path)
+            ext = raw_ext.lstrip(".").lower()
+        except Exception:
+            ext = ""
+        if ext not in _VALID_THUMB_EXTS:
             ext = "jpg"
             
         filename = f"{file_hash}.{ext}"

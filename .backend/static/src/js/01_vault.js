@@ -5,7 +5,7 @@
 
         function handleVaultFileDrop(event) {
             const files = Array.from(event.dataTransfer.files).filter(f =>
-                /\.(safetensors|ckpt|pt|bin)$/i.test(f.name)
+                /\.(safetensors|ckpt|pt|pth|bin|sft|gguf)$/i.test(f.name)
             );
             if(!files.length) return;
             openImportDialog(files);
@@ -13,7 +13,7 @@
 
         function handleVaultFileInput(fileList) {
             const files = Array.from(fileList).filter(f =>
-                /\.(safetensors|ckpt|pt|bin)$/i.test(f.name)
+                /\.(safetensors|ckpt|pt|pth|bin|sft|gguf)$/i.test(f.name)
             );
             if(!files.length) return;
             openImportDialog(files);
@@ -164,7 +164,7 @@
             try {
                 const res = await fetch(`/api/vault/search?query=${encodeURIComponent(query)}&limit=40`);
                 const data = await res.json();
-                renderVaultGrid(data.results || [], false);
+                renderVaultGrid(data.models || [], false);
                 document.getElementById('vault-load-more-container').style.display = 'none'; // Disable pagination for semantic search for now
             } catch(e) {
                 console.error("Semantic search failed:", e);
