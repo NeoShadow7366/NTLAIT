@@ -469,6 +469,15 @@
             if(window.isVaultMode) {
                 btnStandard.style.display = 'none';
                 btnVault.style.display = 'flex';
+                // Show Hash button only for unhashed models (no file_hash = no CivitAI metadata)
+                const hashBtn = document.getElementById('lb-hash-btn');
+                if(hashBtn) {
+                    const model = window.currentModalModel;
+                    const isUnhashed = model && !model.file_hash;
+                    hashBtn.style.display = isUnhashed ? 'inline-flex' : 'none';
+                    hashBtn.style.alignItems = 'center';
+                    hashBtn.style.gap = '6px';
+                }
             } else {
                 btnStandard.style.display = 'block';
                 btnVault.style.display = 'none';
@@ -592,6 +601,61 @@
                     loadModels();
                 } else alert("Repair failed: " + (response.message || "Unknown error"));
             } catch(e) { alert("Failed to repair model"); }
+        }
+
+        async function hashSingleVaultModel() {
+            const model = window.currentModalModel;
+            if(!model || !model.id) { showToast('No model ID available.'); return; }
+
+            const hashBtn = document.getElementById('lb-hash-btn');
+            if(hashBtn) {
+                hashBtn.disabled = true;
+                hashBtn.textContent = '⏳ Hashing...';
+            }
+
+            try {
+                // Start background hash for this specific model by DB id
+                const res = await fetch('/api/vault/hash_single', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ model_id: model.id })
+                });
+                const data = await res.json();
+                if(data.error) {
+                    showToast('Hash failed: ' + data.error);
+                    if(hashBtn) { hashBtn.disabled = false; hashBtn.innerHTML = 'Hash 🔑'; }
+                    return;
+                }
+
+                // Poll scan_progress until no longer active
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const pr = await fetch('/api/vault/scan_progress');
+                        const progress = await pr.json();
+                        if(!progress.active) {
+                            clearInterval(pollInterval);
+                            showToast('✅ Hash complete! Metadata updated.');
+                            // Refresh vault grid and hide hash button
+                            loadModels(false);
+                            closeLightbox();
+                        } else if(hashBtn) {
+                            const pct = progress.percent || 0;
+                            hashBtn.textContent = `⏳ ${pct}%`;
+                        }
+                    } catch(e) {
+                        clearInterval(pollInterval);
+                    }
+                }, 1500);
+
+                // Safety timeout: stop polling after 5 minutes
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    if(hashBtn) { hashBtn.disabled = false; hashBtn.innerHTML = 'Hash 🔑'; }
+                }, 5 * 60 * 1000);
+
+            } catch(e) {
+                showToast('Failed to start hash: ' + e.message);
+                if(hashBtn) { hashBtn.disabled = false; hashBtn.innerHTML = 'Hash 🔑'; }
+            }
         }
 
         async function executeVaultOpenFolder() {

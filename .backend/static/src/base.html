@@ -1214,8 +1214,8 @@
                  onclick="document.getElementById('vault-file-input').click()">
                 <div style="font-size: 2.5rem;">📂</div>
                 <div style="font-weight: 600; color: var(--text-main); margin: 8px 0 4px;">Drag & Drop Model Files Here</div>
-                <div>.safetensors &nbsp;·&nbsp; .ckpt &nbsp;·&nbsp; .pt &nbsp;·&nbsp; .bin</div>
-                <input type="file" id="vault-file-input" accept=".safetensors,.ckpt,.pt,.bin" multiple style="display:none" onchange="handleVaultFileInput(this.files)">
+                <div>.safetensors &nbsp;·&nbsp; .ckpt &nbsp;·&nbsp; .pt &nbsp;·&nbsp; .pth &nbsp;·&nbsp; .bin &nbsp;·&nbsp; .sft &nbsp;·&nbsp; .gguf</div>
+                <input type="file" id="vault-file-input" accept=".safetensors,.ckpt,.pt,.pth,.bin,.sft,.gguf" multiple style="display:none" onchange="handleVaultFileInput(this.files)">
             </div>
 
             <div class="toolbar" style="margin-bottom: 20px;">
@@ -1401,7 +1401,8 @@
                         </button>
                         <div style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-top:10px;" id="lb-download-meta"></div>
                     </div>
-                    <div id="lb-actions-vault" style="display:none; gap:10px;">
+                    <div id="lb-actions-vault" style="display:none; gap:10px; flex-wrap:wrap;">
+                        <button id="lb-hash-btn" onclick="hashSingleVaultModel()" style="display:none; background:#6366f1; color:#fff; border:none; padding:12px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;" title="Compute SHA-256 hash and fetch CivitAI metadata">Hash 🔑</button>
                         <button onclick="executeVaultRepair()" style="background:#f59e0b; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;" title="Repair Metadata &amp; Images">Repair 🛠️</button>
                         <button onclick="executeVaultOpenFolder()" style="flex:1; background:var(--surface-hover); color:#fff; border:1px solid rgba(255,255,255,0.1); padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Open Folder</button>
                         <button onclick="executeVaultRedownload()" style="flex:1; background:var(--primary); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Redownload</button>
