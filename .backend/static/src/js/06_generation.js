@@ -78,6 +78,10 @@
             // IS-01: Inpainting mask (was missing from executeInference)
             if (typeof hasInpaintMask === 'function' && hasInpaintMask()) {
                 payload.mask_b64 = getInpaintMaskBase64();
+                // Phase 3: Inpaint fine controls
+                payload.inpaint_denoise = window._inpaintDenoise ?? 0.75;
+                payload.inpaint_mask_blur = window._inpaintMaskBlur ?? 4;
+                payload.inpaint_fill_mode = window._inpaintFillMode ?? 'original';
                 const canvasImg = document.getElementById('inf-canvas-img');
                 if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none' && !payload.init_image_b64) {
                     const tmpCanvas = document.createElement('canvas');
@@ -91,7 +95,10 @@
             // IS-01: Regional prompting (was missing from executeInference)
             if (typeof getRegionData === 'function') {
                 const regionData = getRegionData();
-                if (regionData) payload.regions = regionData;
+                if (regionData) {
+                    payload.regions = regionData;
+                    payload.region_base_ratio = window._regionBaseRatio ?? 0.0;
+                }
             }
 
             return payload;
@@ -319,10 +326,10 @@
                 if(data.status === 'success') {
                     updateDownloadStatus();
                 } else {
-                    alert("Failed to clear: " + data.message);
+                    showToast('❌ Failed to clear: ' + data.message);
                 }
             } catch(e) {
-                alert("Request failed");
+                showToast('❌ Request failed');
             }
         }
 
@@ -351,9 +358,9 @@
                     // Update UI quickly
                     updateDownloadStatus();
                 } else {
-                    alert("Retry failed: " + data.message);
+                    showToast('❌ Retry failed: ' + data.message);
                 }
-            } catch(e) { alert("Retry request failed"); }
+            } catch(e) { showToast('❌ Retry request failed'); }
         }
 
         // Initial poll on load
@@ -470,7 +477,7 @@
                     }
                 }, 1000);
             } catch(e) { 
-                alert("Failed to launch Engine");
+                showToast('❌ Failed to launch Engine');
                 window.engineLaunching = false; 
             }
         }
@@ -547,6 +554,8 @@
             // IS-11: Show cancel button
             const cancelBtn = document.getElementById('inf-cancel-btn');
             if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+            // Phase 1: Exit compare mode before starting new generation
+            if (window._compareActive) toggleCompareMode();
             document.getElementById('inf-canvas-img').style.display = 'none';
             document.getElementById('inf-canvas-empty').style.display = 'block';
             document.getElementById('inf-canvas-empty').innerText = "Waking Engine...";
@@ -762,6 +771,8 @@
                                         if (cancelBtn) cancelBtn.style.display = 'none';
                                         window._activeGenController = null;
                                         setTimeout(() => fill.style.width = '0%', 800);
+                                        // Phase 1: Update compare button state (new after image available)
+                                        if (typeof updateCompareButtonState === 'function') updateCompareButtonState();
                                         break;
                                     }
                                 }
@@ -804,7 +815,7 @@
             } catch(e) {
                 if (e.name === 'AbortError') return;  // IS-11: User cancelled — cancelInference already cleaned up
                 if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
-                alert("Generation Failed: " + e.message + `\n\nIs ${engine} running?`);
+                showToast('❌ Generation Failed: ' + e.message + `. Is ${engine} running?`);
                 btn.disabled = false;
                 txt.innerText = "Generate Image";
                 fill.style.width = '0%';

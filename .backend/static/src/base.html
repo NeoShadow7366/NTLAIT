@@ -816,6 +816,255 @@
         .disk-warning-text .title { font-weight: 700; color: #fbbf24; font-size: 0.9rem; }
         .disk-warning-text .detail { color: #d4a43a; font-size: 0.82rem; margin-top: 2px; }
 
+        /* ═══ Prompt Syntax Highlighting ═══ */
+        .prompt-editor-container {
+            position: relative;
+            margin-bottom: 4px;
+        }
+        .prompt-textarea {
+            flex: 1; outline: none; background: transparent; border: 1px solid var(--border);
+            color: #fff; padding: 15px; border-radius: 8px; resize: vertical;
+            min-height: 100px; font-size: 1rem; font-family: inherit;
+            line-height: 1.5;
+            width: 100%; box-sizing: border-box; position: relative; z-index: 2;
+            overflow-y: scroll; overflow-x: hidden;
+            white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+            /* Make text invisible — highlight layer shows the colored version */
+            caret-color: #fff;
+        }
+        .prompt-textarea.highlighting-active {
+            color: transparent;
+        }
+        .prompt-highlight-layer {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            padding: 15px; border: 1px solid transparent; border-radius: 8px;
+            font-size: 1rem; font-family: inherit;
+            line-height: 1.5;
+            white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+            overflow-y: scroll; overflow-x: hidden;
+            z-index: 1; pointer-events: none; background: var(--bg-color);
+            box-sizing: border-box;
+            color: #e2e8f0;
+        }
+        .prompt-emphasis { color: #fbbf24; } /* gold */
+        .prompt-emphasis .prompt-weight { color: #f59e0b; font-size: 0.9em; }
+        .prompt-deemphasis { color: #60a5fa; } /* blue */
+        .prompt-network { color: #4ade80; } /* green */
+        .prompt-network .prompt-weight { color: #22c55e; font-size: 0.9em; }
+        .prompt-wildcard { color: #c084fc; } /* purple */
+        .prompt-comment { color: #64748b; font-style: italic; } /* gray */
+        .prompt-weight { color: #fb923c; } /* orange */
+
+        /* ═══ Phase 1 — Tool Buttons with Labels ═══ */
+        .tool-btn {
+            height: 44px; flex-shrink: 0;
+            background: var(--surface-hover); border: 1px solid var(--border);
+            border-radius: 10px; color: #94a3b8; cursor: pointer;
+            font-size: 0.82rem; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+            padding: 0 14px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
+        }
+        .tool-btn:hover { border-color: var(--primary); color: #e2e8f0; background: rgba(99,102,241,0.12); }
+        .tool-btn.active {
+            background: var(--primary); border-color: var(--primary); color: #fff;
+            box-shadow: 0 0 14px rgba(99,102,241,0.35);
+        }
+        .tool-btn .tool-icon { font-size: 1.15rem; line-height: 1; }
+        .tool-btn .tool-label { font-size: 0.78rem; }
+
+        /* ═══ Phase 1 — Mode Banner ═══ */
+        .mode-banner {
+            display: none; align-items: center; justify-content: space-between;
+            padding: 8px 16px; font-size: 0.84rem; font-weight: 600;
+            border-radius: 8px; margin-top: 8px;
+            animation: modeBannerSlideIn 0.25s ease-out;
+        }
+        .mode-banner.active { display: flex; }
+        .mode-banner.inpaint {
+            background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(139,92,246,0.12));
+            border: 1px solid rgba(168,85,247,0.35); color: #c4b5fd;
+        }
+        .mode-banner.region {
+            background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.12));
+            border: 1px solid rgba(59,130,246,0.35); color: #93c5fd;
+        }
+        .mode-banner.compare {
+            background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.12));
+            border: 1px solid rgba(16,185,129,0.35); color: #6ee7b7;
+        }
+        .mode-banner .mode-exit-btn {
+            background: none; border: 1px solid currentColor; color: inherit;
+            padding: 3px 12px; border-radius: 6px; cursor: pointer;
+            font-size: 0.78rem; font-weight: 600; transition: all 0.15s;
+            opacity: 0.8;
+        }
+        .mode-banner .mode-exit-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+        @keyframes modeBannerSlideIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ═══ Phase 1 — Brush Cursor ═══ */
+        #brush-cursor {
+            position: fixed; pointer-events: none; z-index: 9999;
+            border-radius: 50%; display: none;
+            transition: width 0.08s ease, height 0.08s ease;
+        }
+        #brush-cursor.brush-mode {
+            border: 2px solid rgba(255,255,255,0.8);
+            background: rgba(168,85,247,0.12);
+        }
+        #brush-cursor.eraser-mode {
+            border: 2px dashed rgba(239,68,68,0.8);
+            background: rgba(239,68,68,0.08);
+        }
+
+        /* ═══ Phase 1 — Before/After Compare Overlay ═══ */
+        .compare-overlay {
+            position: absolute; inset: 0; z-index: 25;
+            display: none; overflow: hidden;
+            background: #000;
+        }
+        .compare-overlay.active { display: block; }
+        .compare-overlay.side-by-side {
+            display: flex;
+        }
+        .compare-overlay.side-by-side .compare-pane {
+            flex: 1; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .compare-overlay.side-by-side .compare-pane img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+        .compare-overlay.side-by-side .compare-divider-sbs {
+            width: 3px; background: var(--primary); flex-shrink: 0;
+        }
+        /* Clip-rect mode: both images fill the container, divider clips */
+        .compare-before-img, .compare-after-img {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        .compare-divider {
+            position: absolute; top: 0; bottom: 0;
+            width: 4px; background: var(--primary);
+            cursor: col-resize; z-index: 28;
+            transition: background 0.15s;
+        }
+        .compare-divider:hover, .compare-divider.dragging {
+            background: #818cf8; box-shadow: 0 0 12px rgba(129,140,248,0.5);
+        }
+        .compare-divider::after {
+            content: '⟺'; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15,23,42,0.85); backdrop-filter: blur(4px);
+            color: #e2e8f0; padding: 4px 8px; border-radius: 6px;
+            font-size: 0.75rem; font-weight: 700;
+            border: 1px solid rgba(99,102,241,0.4);
+            white-space: nowrap;
+        }
+        .compare-pane-label {
+            position: absolute; top: 10px; z-index: 29;
+            background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+            padding: 4px 14px; border-radius: 8px;
+            font-size: 0.78rem; font-weight: 700; color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.1);
+            pointer-events: none;
+        }
+        .compare-pane-label.before { left: 12px; }
+        .compare-pane-label.after { right: 12px; }
+        .compare-toolbar {
+            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+            z-index: 30; background: rgba(15,23,42,0.92); backdrop-filter: blur(12px);
+            border: 1px solid rgba(99,102,241,0.3); border-radius: 12px;
+            padding: 6px 14px; display: flex; gap: 8px; align-items: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        }
+        .compare-toolbar button {
+            background: var(--surface-hover); border: 1px solid var(--border);
+            color: #e2e8f0; padding: 5px 12px; border-radius: 8px;
+            cursor: pointer; font-size: 0.8rem; font-weight: 600;
+            transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+        }
+        .compare-toolbar button:hover { border-color: var(--primary); background: rgba(99,102,241,0.15); }
+        .compare-toolbar button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .compare-toolbar .separator {
+            width: 1px; height: 20px; background: var(--border); flex-shrink: 0;
+        }
+
+        /* ═══ Phase 2 — Edit Timeline Strip ═══ */
+        .edit-timeline {
+            display: none; border-top: 1px solid var(--border);
+            background: rgba(15,23,42,0.6); flex-shrink: 0;
+            padding: 0; overflow: hidden;
+        }
+        .edit-timeline.has-entries { display: block; }
+        .edit-timeline-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 10px 0;
+        }
+        .edit-timeline-header .timeline-title {
+            font-size: 0.72rem; color: var(--text-muted); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .edit-timeline-header .timeline-nav {
+            display: flex; gap: 4px; align-items: center;
+        }
+        .edit-timeline-header .timeline-nav button {
+            background: var(--surface-hover); border: 1px solid var(--border);
+            color: var(--text-muted); padding: 2px 8px; border-radius: 5px;
+            cursor: pointer; font-size: 0.72rem; font-weight: 700;
+            transition: all 0.15s;
+        }
+        .edit-timeline-header .timeline-nav button:hover:not(:disabled) {
+            border-color: var(--primary); color: #e2e8f0;
+        }
+        .edit-timeline-header .timeline-nav button:disabled {
+            opacity: 0.3; cursor: default;
+        }
+        .edit-timeline-strip {
+            display: flex; gap: 6px; padding: 5px 10px 8px;
+            overflow-x: auto; scroll-behavior: smooth;
+        }
+        .edit-timeline-strip::-webkit-scrollbar { height: 4px; }
+        .edit-timeline-strip::-webkit-scrollbar-thumb {
+            background: var(--border); border-radius: 4px;
+        }
+        .edit-timeline-item {
+            flex-shrink: 0; width: 56px; height: 56px;
+            border-radius: 8px; overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer; position: relative;
+            transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+            background: var(--surface-hover);
+        }
+        .edit-timeline-item:hover {
+            border-color: rgba(99,102,241,0.5);
+            transform: translateY(-2px);
+        }
+        .edit-timeline-item.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(99,102,241,0.4);
+        }
+        .edit-timeline-item img {
+            width: 100%; height: 100%; object-fit: cover;
+            pointer-events: none;
+        }
+        .edit-timeline-item .step-badge {
+            position: absolute; bottom: 2px; right: 2px;
+            background: rgba(0,0,0,0.75); color: #e2e8f0;
+            font-size: 0.6rem; font-weight: 700; padding: 1px 5px;
+            border-radius: 4px; pointer-events: none;
+        }
+        .edit-timeline-item .branch-indicator {
+            position: absolute; top: 2px; left: 2px;
+            font-size: 0.55rem; pointer-events: none;
+        }
+
         /* ═══ Sprint 12 — Inpainting Canvas ═══ */
         .inpaint-toolbar {
             display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
@@ -824,6 +1073,7 @@
             padding: 8px 14px; gap: 10px; align-items: center;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
             animation: cmdSlideIn 0.2s ease-out;
+            flex-wrap: wrap; justify-content: center;
         }
         .inpaint-toolbar.active { display: flex; }
         .inpaint-toolbar button {
@@ -834,27 +1084,35 @@
         }
         .inpaint-toolbar button:hover { border-color: var(--primary); background: rgba(99,102,241,0.15); }
         .inpaint-toolbar button.active-tool { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .inpaint-toolbar button:disabled { opacity: 0.4; cursor: default; }
         .inpaint-toolbar .brush-size-ctrl {
             display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.8rem;
         }
         .inpaint-toolbar .brush-size-ctrl input[type="range"] {
             width: 80px; accent-color: var(--primary); cursor: pointer;
         }
+        .inpaint-toolbar .opacity-ctrl {
+            display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.8rem;
+        }
+        .inpaint-toolbar .opacity-ctrl input[type="range"] {
+            width: 60px; accent-color: #a855f7; cursor: pointer;
+        }
         .inpaint-toolbar .separator {
             width: 1px; height: 24px; background: var(--border); flex-shrink: 0;
         }
         #inpaint-canvas {
             position: absolute; top: 0; left: 0;
-            z-index: 15; cursor: crosshair; display: none;
+            z-index: 15; cursor: none; display: none;
             pointer-events: none;
         }
         #inpaint-canvas.active { display: block; pointer-events: auto; }
 
-        /* ═══ Sprint 12 — Outpainting Direction Buttons ═══ */
+        /* ═══ Phase 1 — Outpainting Direction Buttons (visible when image present) ═══ */
         .outpaint-controls {
             display: none; position: absolute; z-index: 18;
             pointer-events: none;
         }
+        .outpaint-controls.has-image { display: block; }
         .outpaint-controls.active { display: block; }
         .outpaint-btn {
             position: absolute; pointer-events: auto;
@@ -874,6 +1132,47 @@
         .outpaint-btn.down:hover  { transform: translateX(-50%) scale(1.15); }
         .outpaint-btn.left:hover  { transform: translateY(-50%) scale(1.15); }
         .outpaint-btn.right:hover { transform: translateY(-50%) scale(1.15); }
+        /* Subtle pulse animation when outpaint buttons first appear */
+        .outpaint-controls.has-image .outpaint-btn {
+            animation: outpaintPulse 2s ease-in-out 0.5s 2;
+        }
+        @keyframes outpaintPulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+            50% { box-shadow: 0 4px 18px rgba(99,102,241,0.5), 0 0 8px rgba(99,102,241,0.3); }
+        }
+
+        /* ═══ Phase 3 — Outpaint Size Selector ═══ */
+        .outpaint-size-selector {
+            position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 3px; z-index: 19; pointer-events: auto;
+        }
+        .outpaint-size-btn {
+            background: rgba(15,23,42,0.88); backdrop-filter: blur(6px);
+            border: 1px solid rgba(99,102,241,0.25); color: #94a3b8;
+            padding: 2px 8px; border-radius: 4px; cursor: pointer;
+            font-size: 0.65rem; font-weight: 600; transition: all 0.15s;
+            pointer-events: auto;
+        }
+        .outpaint-size-btn:hover { border-color: var(--primary); color: #e2e8f0; }
+        .outpaint-size-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+        /* ═══ Phase 3 — Inpaint Fine Controls ═══ */
+        .inpaint-toolbar .fine-ctrl {
+            display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 0.75rem;
+        }
+        .inpaint-toolbar .fine-ctrl input[type="range"] {
+            width: 55px; cursor: pointer;
+        }
+        .inpaint-toolbar .fine-ctrl .fine-label {
+            font-weight: 600; white-space: nowrap;
+        }
+        .inpaint-toolbar .fine-ctrl .fine-value {
+            min-width: 26px; text-align: right; font-variant-numeric: tabular-nums;
+        }
+        .inpaint-toolbar .fine-ctrl select {
+            background: var(--surface); color: var(--text); border: 1px solid var(--border);
+            border-radius: 4px; padding: 1px 4px; font-size: 0.7rem; cursor: pointer;
+        }
 
         /* ═══ Sprint 12 — Generation Progress Bar ═══ */
         .gen-progress-bar {
@@ -893,7 +1192,7 @@
         }
         .gen-progress-info.active { display: block; }
 
-        /* ═══ Sprint 12 — Regional Prompting ═══ */
+        /* ═══ Phase 2 — Regional Prompting (Enhanced) ═══ */
         .region-editor {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 16; display: none; pointer-events: none;
@@ -901,38 +1200,68 @@
         .region-editor.active { display: block; pointer-events: auto; cursor: crosshair; }
         .region-zone {
             position: absolute; border: 2px solid;
-            background: rgba(255,255,255,0.08);
             display: flex; flex-direction: column;
-            cursor: move; min-width: 40px; min-height: 40px;
+            cursor: move; min-width: 60px; min-height: 60px;
+            border-radius: 4px;
+            transition: box-shadow 0.15s;
         }
+        .region-zone:hover { box-shadow: 0 0 12px rgba(255,255,255,0.15); }
         .region-zone .zone-header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 2px 6px; font-size: 0.7rem; font-weight: 700;
-            color: #fff; background: rgba(0,0,0,0.6);
+            padding: 4px 8px; font-size: 0.78rem; font-weight: 700;
+            color: #fff; background: rgba(0,0,0,0.7);
             cursor: move; user-select: none;
+            border-radius: 3px 3px 0 0;
+        }
+        .region-zone .zone-header .zone-label {
+            display: flex; align-items: center; gap: 5px;
+        }
+        .region-zone .zone-header .zone-color-dot {
+            width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+            border: 1px solid rgba(255,255,255,0.4);
         }
         .region-zone .zone-header .zone-close {
-            cursor: pointer; font-size: 0.85rem; opacity: 0.7;
-            transition: opacity 0.15s;
+            cursor: pointer; font-size: 0.9rem; opacity: 0.6;
+            transition: opacity 0.15s; padding: 0 2px;
         }
         .region-zone .zone-header .zone-close:hover { opacity: 1; }
+        .region-zone .zone-body {
+            flex: 1; display: flex; flex-direction: column; gap: 4px;
+            padding: 4px; min-height: 0;
+        }
         .region-zone textarea {
-            flex: 1; background: rgba(0,0,0,0.5); border: none;
-            color: #e2e8f0; font-size: 0.75rem; font-family: inherit;
-            padding: 4px 6px; resize: none; outline: none;
-            min-height: 28px;
+            flex: 1; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
+            color: #e2e8f0; font-size: 0.78rem; font-family: inherit;
+            padding: 6px 8px; resize: none; outline: none;
+            min-height: 36px; border-radius: 4px;
+            transition: border-color 0.15s;
+        }
+        .region-zone textarea:focus { border-color: rgba(255,255,255,0.3); }
+        .region-zone textarea::placeholder { color: rgba(255,255,255,0.3); }
+        .region-zone .zone-strength {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.7rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-strength input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer;
         }
         .region-zone .zone-resize {
-            position: absolute; bottom: -4px; right: -4px;
-            width: 12px; height: 12px; cursor: se-resize;
-            background: rgba(255,255,255,0.3); border-radius: 2px;
+            position: absolute; bottom: -2px; right: -2px;
+            width: 18px; height: 18px; cursor: se-resize;
+            background: rgba(255,255,255,0.25); border-radius: 3px 0 3px 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.55rem; color: rgba(255,255,255,0.5);
+            transition: background 0.15s;
         }
+        .region-zone .zone-resize:hover { background: rgba(255,255,255,0.5); }
         .region-toolbar {
             display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
             z-index: 22; background: rgba(15,23,42,0.92); backdrop-filter: blur(12px);
-            border: 1px solid rgba(99,102,241,0.3); border-radius: 12px;
-            padding: 8px 14px; gap: 10px; align-items: center;
+            border: 1px solid rgba(59,130,246,0.3); border-radius: 12px;
+            padding: 8px 14px; gap: 8px; align-items: center;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            flex-wrap: wrap; justify-content: center;
         }
         .region-toolbar.active { display: flex; }
         .region-toolbar button {
@@ -948,6 +1277,19 @@
         .region-toolbar .zone-count {
             color: var(--text-muted); font-size: 0.8rem; font-weight: 600;
         }
+        /* Layout preset buttons */
+        .region-toolbar .layout-presets {
+            display: flex; gap: 4px; align-items: center;
+        }
+        .region-toolbar .layout-preset-btn {
+            width: 32px; height: 24px; padding: 0;
+            background: var(--surface-hover); border: 1px solid var(--border);
+            border-radius: 4px; cursor: pointer; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.65rem; color: var(--text-muted);
+        }
+        .region-toolbar .layout-preset-btn:hover { border-color: #3b82f6; color: #93c5fd; background: rgba(59,130,246,0.12); }
+        .region-toolbar .layout-preset-btn svg { width: 18px; height: 14px; }
 
         /* ═══ Sprint 12 — X/Y/Z Plot Panel ═══ */
         .xyz-panel {
@@ -1017,6 +1359,74 @@
             font-size: 0.68rem; padding: 3px 6px; text-align: center;
         }
 
+
+        /* ═══ Sprint 13 — UI/UX Button Refactoring ═══ */
+        .btn-base {
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px 20px;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+            padding: 10px 20px;
+        }
+        .btn-danger:hover { background: #dc2626; transform: translateY(-1px); }
+        
+        .btn-secondary {
+            background: var(--surface-hover);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 10px 15px;
+            font-size: 0.85rem;
+        }
+        .btn-secondary:hover { border-color: var(--primary); color: #fff; }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 5px 12px;
+            font-size: 0.8rem;
+        }
+        .btn-outline:hover { color: white; border-color: #ef4444; }
+        
+        .btn-icon {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-icon:hover { color: #fff; }
+
+        [data-theme="glass"] .std-card,
+        [data-theme="glass"] .dash-card,
+        [data-theme="glass"] .lightbox-content,
+        [data-theme="glass"] .export-dialog {
+            background: rgba(30, 41, 59, 0.45) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
     </style>
 </head>
 <body>
@@ -1024,19 +1434,19 @@
     <!-- Sprint 7: LAN Warning Banner -->
     <div id="lan-banner" class="lan-banner">⚠️ LAN Mode Active — Dashboard accessible to devices on your network at <span id="lan-ip-display">http://0.0.0.0:8080</span></div>
 
-    <div class="sidebar">
+    <nav class="sidebar">
         <h2><img src="/icons/Logo.ico" alt="Logo" style="width:28px; height:28px; vertical-align:middle; margin-right:8px; border-radius:4px;">AI Manager</h2>
-        <div class="nav-item" onclick="switchTab('dashboard', this)"><img src="/icons/Dashboard.ico" alt="">Dashboard</div>
-        <div class="nav-item" onclick="switchTab('appstore', this)"><img src="/icons/App Store.ico" alt="">App Store</div>
-        <div class="nav-item active" onclick="switchTab('explorer', this)"><img src="/icons/Model Explorer.ico" alt="">Model Explorer</div>
-        <div class="nav-item" onclick="switchTab('inference', this)"><img src="/icons/Inference Studio.ico" alt="">Inference Studio</div>
-        <div class="nav-item" onclick="switchTab('creations', this)"><img src="/icons/My Creations.ico" alt="">My Creations</div>
-        <div class="nav-item" onclick="switchTab('packages', this)"><img src="/icons/Installed Packages.ico" alt="">Installed Packages</div>
-        <div class="nav-item" onclick="switchTab('vault', this)"><img src="/icons/Global Vault.ico" alt="">Global Vault</div>
-        <div class="nav-item" onclick="switchTab('settings', this)" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;"><img src="/icons/Settings.ico" alt="">Settings</div>
-    </div>
+        <div class="nav-item" onclick="switchTab('dashboard', this)"><img src="/icons/Dashboard.ico" alt="" aria-hidden="true">Dashboard</div>
+        <div class="nav-item" onclick="switchTab('appstore', this)"><img src="/icons/App Store.ico" alt="" aria-hidden="true">App Store</div>
+        <div class="nav-item active" onclick="switchTab('explorer', this)"><img src="/icons/Model Explorer.ico" alt="" aria-hidden="true">Model Explorer</div>
+        <div class="nav-item" onclick="switchTab('inference', this)"><img src="/icons/Inference Studio.ico" alt="" aria-hidden="true">Inference Studio</div>
+        <div class="nav-item" onclick="switchTab('creations', this)"><img src="/icons/My Creations.ico" alt="" aria-hidden="true">My Creations</div>
+        <div class="nav-item" onclick="switchTab('packages', this)"><img src="/icons/Installed Packages.ico" alt="" aria-hidden="true">Installed Packages</div>
+        <div class="nav-item" onclick="switchTab('vault', this)"><img src="/icons/Global Vault.ico" alt="" aria-hidden="true">Global Vault</div>
+        <div class="nav-item" onclick="switchTab('settings', this)" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;"><img src="/icons/Settings.ico" alt="" aria-hidden="true">Settings</div>
+    </nav>
 
-    <div class="main-content">
+    <main class="main-content">
         <header>
             <h1 id="page-title">Model Explorer</h1>
             <div id="page-subtitle" class="subtitle">Discover and download native models directly from CivitAI.</div>
@@ -1087,7 +1497,7 @@
                 <div class="activity-feed">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h3 style="margin: 0;">📈 Recent Activity</h3>
-                        <button onclick="clearDashboardActivity()" style="background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.color='white'; this.style.borderColor='#ef4444';" onmouseout="this.style.color='var(--text-muted)'; this.style.borderColor='var(--border)';">Clear Feed</button>
+                        <button id="btn-dash-clear" class="btn-base btn-outline" onclick="clearDashboardActivity()">Clear Feed</button>
                     </div>
                     <div id="dash-activity-list">
                         <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 20px;">No recent activity.</div>
@@ -1193,7 +1603,7 @@
                     <span>📥</span>
                     <span id="ex-dl-badge" class="badge-count" style="display:none">0</span>
                 </button>
-                <button onclick="toggleSettings()" class="dl-indicator-btn" title="CivitAI Settings">
+                <button id="btn-settings-toggle-top" onclick="toggleSettings()" class="dl-indicator-btn" title="CivitAI Settings">
                     <span>⚙️</span>
                 </button>
             </div>
@@ -1218,10 +1628,11 @@
                 <input type="file" id="vault-file-input" accept=".safetensors,.ckpt,.pt,.pth,.bin,.sft,.gguf" multiple style="display:none" onchange="handleVaultFileInput(this.files)">
             </div>
 
-            <div class="toolbar" style="margin-bottom: 20px;">
+            <!-- Row 1: Search & Filters (Discovery) -->
+            <div class="toolbar" style="margin-bottom: 10px;">
                 <input type="text" id="vault-search" placeholder="Semantic Search: 'anime', 'realism' (Press Enter)" style="flex: 1;" onkeyup="if(event.key==='Enter') searchVaultModels(this.value)">
-                <select id="vault-tag-filter" class="select-fancy" style="width: auto; margin-right: 10px;" onchange="filterVaultByTag(this.value)">
-                    <option value="">All Collections / Tags</option>
+                <select id="vault-tag-filter" class="select-fancy" style="width: auto;" onchange="filterVaultByTag(this.value)">
+                    <option value="">All Tags</option>
                 </select>
                 <select id="vault-cat-filter" onchange="filterVaultGrid(document.getElementById('vault-search').value)" class="select-fancy" style="width: auto;">
                     <option value="">All Categories</option>
@@ -1235,27 +1646,63 @@
                     <option value="text_encoders">Text Encoders</option>
                     <option value="upscalers">Upscalers</option>
                 </select>
-                <button onclick="triggerHealthCheck()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Clean Broken Package Links">🩺 Health Scan</button>
-                <button onclick="triggerUpdatesCheck()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Query CivitAI for newer versions">🔄 Check Updates</button>
-            <button id="vault-select-toggle" onclick="toggleVaultSelectMode()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Multi-Select for Bulk Operations">☑️ Select</button>
-                <button onclick="triggerUnmanagedImport()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #a7f3d0; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Scan Global_Vault for local files and fetch metadata">📥 Import Local Files</button>
-                <button onclick="triggerExternalImport()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #fde047; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Link an external folder (e.g. Stability Matrix Models)">🔗 External Folder</button>
-                <button id="btn-vault-import-backup" onclick="document.getElementById('vault-import-file').click()" style="margin-left: 10px; padding: 10px 15px; background: var(--surface-hover); color: #60a5fa; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;" title="Import metadata from a vault export JSON">📤 Import Backup</button>
+                <select id="vault-type-filter" class="select-fancy" style="width: auto;" onchange="filterVaultGrid(document.getElementById('vault-search').value)">
+                    <option value="">All Types</option>
+                    <option value="Checkpoint">Checkpoint</option>
+                    <option value="LORA">LoRA</option>
+                    <option value="TextualInversion">Embedding</option>
+                    <option value="Controlnet">ControlNet</option>
+                    <option value="VAE">VAE</option>
+                    <option value="Upscaler">Upscaler</option>
+                    <option value="AestheticGradient">Aesthetic Gradient</option>
+                    <option value="Poses">Poses</option>
+                    <option value="Wildcards">Wildcards</option>
+                    <option value="Other">Other</option>
+                </select>
+                <select id="vault-base-filter" class="select-fancy" style="width: auto;" onchange="filterVaultGrid(document.getElementById('vault-search').value)">
+                    <option value="">All Base Models</option>
+                    <option value="SD 1.5">SD 1.5</option>
+                    <option value="SD 2.1">SD 2.1</option>
+                    <option value="SDXL 1.0">SDXL 1.0</option>
+                    <option value="SDXL Turbo">SDXL Turbo</option>
+                    <option value="Pony">Pony</option>
+                    <option value="Flux.1 D">Flux.1 Dev</option>
+                    <option value="Flux.1 S">Flux.1 Schnell</option>
+                    <option value="SD 3">SD 3</option>
+                    <option value="SD 3.5">SD 3.5</option>
+                    <option value="Other">Other</option>
+                </select>
+                <button id="vault-filter-nsfw" class="btn-base btn-secondary" onclick="toggleVaultFilter('nsfw')" title="Show NSFW models (hidden by default)" style="font-size: 0.85rem;">🔞 Show NSFW</button>
+                <span id="vault-filter-status" style="font-size: 0.8rem; color: var(--text-muted); margin-left: auto;"></span>
+            </div>
+
+            <!-- Row 2: Actions & Utilities (Operations) -->
+            <div class="toolbar" id="vault-action-toolbar" style="margin-bottom: 20px; gap: 8px; flex-wrap: wrap;">
+                <button id="vault-filter-unhashed" class="btn-base btn-secondary" onclick="toggleVaultFilter('unhashed')" title="Show only unhashed models" style="font-size: 0.85rem;">🔍 Unhashed Only</button>
+                <button id="btn-sys-health" class="btn-base btn-secondary" onclick="triggerHealthCheck()" title="Clean Broken Package Links">🩺 Health Scan</button>
+                <button id="btn-sys-updates" class="btn-base btn-secondary" onclick="triggerUpdatesCheck()" title="Query CivitAI for newer versions">🔄 Check Updates</button>
+                <button id="vault-select-toggle" onclick="toggleVaultSelectMode()" class="btn-base btn-secondary" title="Multi-Select for Bulk Operations">☑️ Select</button>
+                <button id="btn-vault-import-local" class="btn-base btn-secondary" onclick="triggerUnmanagedImport()" title="Scan Global_Vault for local files and fetch metadata">📥 Import Local</button>
+                <button id="btn-vault-import-ext" class="btn-base btn-secondary" onclick="triggerExternalImport()" title="Link an external folder (e.g. Stability Matrix Models)">🔗 External Folder</button>
+                <button id="btn-vault-sources" class="btn-base btn-secondary" onclick="showExternalSources()" title="View linked external model sources">📍 Sources</button>
+                <button id="btn-vault-hash-library" class="btn-base btn-secondary" onclick="hashLibrary()" title="Compute SHA-256 hashes for all unhashed models to unlock CivitAI metadata">🔑 Hash Library</button>
+                <button id="btn-vault-import-backup" class="btn-base btn-secondary" onclick="document.getElementById(\'vault-import-file\').click()" title="Import metadata from a vault export JSON">📤 Import Backup</button>
                 <input type="file" id="vault-import-file" accept=".json" style="display:none" onchange="handleVaultImportBackup(this.files[0])">
             </div>
 
             <div class="grid" id="models-grid" style="--card-width: 250px;"></div>
             <div id="vault-load-more-container" style="text-align: center; padding: 40px 0; display: none;">
-                <button onclick="loadModels(true)" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 12px 30px; border-radius: 10px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Load More Models</button>
+                <button id="btn-vault-load-more" class="btn-base btn-secondary" onclick="loadModels(true)">Load More Models</button>
             </div>
         </div>
 
         <!-- Sprint 7: Vault Bulk Action Bar -->
         <div id="vault-action-bar" class="vault-action-bar">
             <span id="vault-select-count" style="color:#fff; font-weight:600; font-size:0.95rem;">0 models selected</span>
-            <button onclick="executeVaultExport()" style="background:#6366f1; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">📦 Export</button>
-            <button onclick="executeBulkDelete()" style="background:#ef4444; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">🗑️ Delete Selected</button>
-            <button onclick="cancelVaultSelection()" style="background:var(--surface-hover); color:#fff; border:1px solid var(--border); padding:10px 20px; border-radius:8px; cursor:pointer;">❌ Cancel</button>
+            <button id="btn-vault-action-export" class="btn-base btn-primary" onclick="executeVaultExport()">📦 Export</button>
+            <button id="btn-vault-action-migrate" class="btn-base btn-primary" onclick="openBulkMigrateDialog()" style="background:#6366f1;">📦 Migrate Selected</button>
+            <button id="btn-vault-action-delete" class="btn-base btn-danger" onclick="executeBulkDelete()">🗑️ Delete Selected</button>
+            <button id="btn-vault-action-cancel" class="btn-base btn-secondary" onclick="cancelVaultSelection()">❌ Cancel</button>
         </div>
 
         <!-- My Creations View -->
@@ -1281,7 +1728,7 @@
         <div id="view-appstore" style="display: none; padding-top: 10px;">
             <div class="toolbar" style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); background: var(--surface);">
                 <div style="font-weight: 600;">Sandbox App Deployment</div>
-                <button onclick="document.getElementById('recipe-modal').style.display='flex';" style="background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">✨ Create Recipe</button>
+                <button id="btn-recipe-create" class="btn-base btn-primary" onclick="document.getElementById(\'recipe-modal\').style.display=\'flex\';">✨ Create Recipe</button>
             </div>
             <div class="grid" id="recipes-grid"></div>
         </div>
@@ -1341,14 +1788,32 @@
                         </div>
                     </div>
 
-                    <button onclick="saveSettings()" style="background:var(--primary); color:#fff; border:none; padding:12px 20px; border-radius:8px; font-weight:600; cursor:pointer;">💾 Save Preferences</button>
+                    <div>
+                        <label class="section-title">⚡ Auto-VRAM Flush After Generation</label>
+                        <p style="color:var(--text-muted); font-size:0.8rem; margin:4px 0 10px 0;">Automatically unload models from GPU after generation if VRAM usage exceeds this percentage. Set to 0 to disable. Higher values (85-95%) prevent OOM on consecutive generations. Lower values aggressively free memory but may slow down sequential generations that reuse the same model.</p>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <input type="range" id="set-vram-flush-pct" min="0" max="99" value="90" style="flex:1; accent-color: var(--primary);" oninput="document.getElementById('set-vram-flush-label').textContent = this.value == 0 ? 'Disabled' : this.value + '%'">
+                            <span id="set-vram-flush-label" style="min-width:65px; text-align:right; font-weight:600; color:var(--text-primary); font-size:0.95rem;">90%</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="section-title">🖼️ Outpainting Extension Size</label>
+                        <p style="color:var(--text-muted); font-size:0.8rem; margin:4px 0 10px 0;">Pixels to extend when using outpainting direction buttons in Inference Studio. Smaller values give finer control, larger values extend more canvas per click.</p>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <input type="range" id="set-outpaint-size" min="64" max="512" step="64" value="256" style="flex:1; accent-color: var(--primary);" oninput="document.getElementById('set-outpaint-size-label').textContent = this.value + 'px'">
+                            <span id="set-outpaint-size-label" style="min-width:65px; text-align:right; font-weight:600; color:var(--text-primary); font-size:0.95rem;">256px</span>
+                        </div>
+                    </div>
+
+                    <button id="btn-settings-save" class="btn-base btn-primary" onclick="saveSettings()">💾 Save Preferences</button>
                 </div>
             </div>
 
             <div class="std-card" style="margin-top:30px; border-color: #ef4444;">
                 <h3 style="color:#ef4444; margin-top:0;">System Maintenance</h3>
                 <p style="color:var(--text-muted); font-size:0.9rem;">Trigger an immediate self-update ping to the orchestrator repository to patch `.backend` logic.</p>
-                <button onclick="triggerSystemUpdate()" style="background:#ef4444; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; margin-top:10px;">Apply System Update Toolkit</button>
+                <button id="btn-settings-apply-toolkit" class="btn-base btn-danger" onclick="triggerSystemUpdate()">Apply System Update Toolkit</button>
             </div>
         </div>
 
@@ -1361,8 +1826,8 @@
         <div class="lightbox-content">
             <div class="lb-gallery" style="position:relative;">
                 <div id="lb-gallery-wrapper" style="width:100%; height:100%; display:flex; justify-content:center; align-items:center;"></div>
-                <button class="carousel-btn left" style="display:flex; left:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(-1)">&lt;</button>
-                <button class="carousel-btn right" style="display:flex; right:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(1)">&gt;</button>
+                <button class="carousel-btn left" aria-label="Previous image" style="display:flex; left:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(-1)">&lt;</button>
+                <button class="carousel-btn right" aria-label="Next image" style="display:flex; right:15px; width:45px; height:45px; font-size:1.5rem;" onclick="cycleLightboxImage(1)">&gt;</button>
             </div>
             <div class="lb-details">
                 <div>
@@ -1403,10 +1868,12 @@
                     </div>
                     <div id="lb-actions-vault" style="display:none; gap:10px; flex-wrap:wrap;">
                         <button id="lb-hash-btn" onclick="hashSingleVaultModel()" style="display:none; background:#6366f1; color:#fff; border:none; padding:12px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;" title="Compute SHA-256 hash and fetch CivitAI metadata">Hash 🔑</button>
-                        <button onclick="executeVaultRepair()" style="background:#f59e0b; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;" title="Repair Metadata &amp; Images">Repair 🛠️</button>
-                        <button onclick="executeVaultOpenFolder()" style="flex:1; background:var(--surface-hover); color:#fff; border:1px solid rgba(255,255,255,0.1); padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Open Folder</button>
-                        <button onclick="executeVaultRedownload()" style="flex:1; background:var(--primary); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Redownload</button>
-                        <button onclick="executeVaultDelete()" style="background:#ef4444; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">Delete</button>
+                        <button id="lb-nsfw-toggle" onclick="toggleModelNsfw()" style="background:var(--surface-hover); color:var(--text-muted); border:1px solid var(--border); padding:12px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem;" title="Toggle NSFW flag for this model">🔞 Mark NSFW</button>
+                        <button id="btn-lb-migrate" class="btn-base btn-primary" onclick="openSingleMigrateDialog()" style="background:#6366f1;" title="Move this model to an external location">Migrate 📦</button>
+                        <button id="btn-lb-repair" class="btn-base btn-primary" onclick="executeVaultRepair()" title="Repair Metadata &amp; Images" style="background:#f59e0b;">Repair 🛠️</button>
+                        <button id="btn-lb-open-folder" class="btn-base btn-secondary" style="flex:1;" onclick="executeVaultOpenFolder()">Open Folder</button>
+                        <button id="btn-lb-redownload" class="btn-base btn-primary" style="flex:1;" onclick="executeVaultRedownload()">Redownload</button>
+                        <button id="btn-lb-delete" class="btn-base btn-danger" onclick="executeVaultDelete()">Delete</button>
                     </div>
                 </div>
             </div>
@@ -1425,8 +1892,8 @@
             <input type="password" id="settings-hf-api-key" class="select-fancy" style="width:100%; margin-bottom:20px;" placeholder="Paste HF token for gated models...">
             
             <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="toggleSettings()" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">Cancel</button>
-                <button onclick="saveExplorerApiKeys()" style="background:var(--primary); color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">Save Keys</button>
+                <button id="btn-settings-toggle-bottom" class="btn-base btn-icon" onclick="toggleSettings()">Cancel</button>
+                <button id="btn-explorer-save-keys" class="btn-base btn-primary" onclick="saveExplorerApiKeys()">Save Keys</button>
             </div>
         </div>
     </div>
@@ -1437,16 +1904,19 @@
             <!-- Image Area -->
             <div style="flex:1; background:#000; display:flex; align-items:center; justify-content:center; position:relative;">
                 <img id="gl-img" src="" style="max-width:100%; max-height:100%; object-fit:contain;">
-                <div style="position:absolute; bottom:20px; right:20px; display:flex; gap:10px;">
-                    <button onclick="restoreToStudioFromGallery()" style="background:var(--primary); color:#fff; border:none; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer;">⚡ Send to Studio</button>
-                    <button onclick="deleteGenerationFromGallery()" style="background:#ef4444; color:#fff; border:none; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer;">🗑 Delete</button>
+                <div style="position:absolute; bottom:20px; left:20px; right:20px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+                    <button onclick="copyGenerationParams()" title="Copy parameters" style="background:var(--surface); color:#e2e8f0; border:1px solid var(--border); padding:8px 14px; border-radius:8px; font-weight:500; cursor:pointer; font-size:0.8rem; transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-hover)'" onmouseleave="this.style.background='var(--surface)'">📋 Copy Params</button>
+                    <button onclick="downloadWithMetadata()" title="Download with A1111 metadata" style="background:var(--surface); color:#e2e8f0; border:1px solid var(--border); padding:8px 14px; border-radius:8px; font-weight:500; cursor:pointer; font-size:0.8rem; transition:background 0.15s;" onmouseenter="this.style.background='var(--surface-hover)'" onmouseleave="this.style.background='var(--surface)'">💾 Save PNG</button>
+                    <button onclick="sendToImg2Img()" title="Send to Img2Img" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.8rem;">🖼️ Img2Img</button>
+                    <button onclick="restoreToStudioFromGallery()" style="background:var(--primary); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.8rem;">⚡ Send to Studio</button>
+                    <button onclick="deleteGenerationFromGallery()" style="background:#ef4444; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.8rem;">🗑 Delete</button>
                 </div>
             </div>
             <!-- Metadata Sidebar -->
             <div style="width:320px; border-left:1px solid var(--border); padding:24px; overflow-y:auto; background:var(--surface);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
                     <h2 style="margin:0; font-size:1.1rem;">Generation Info</h2>
-                    <button onclick="document.getElementById('gallery-lightbox').style.display='none'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
+                    <button aria-label="Close Lightbox" onclick="document.getElementById(\'gallery-lightbox\').style.display=\'none\'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
                 </div>
 
                 <!-- Sprint 10: Star Rating -->
@@ -1528,13 +1998,56 @@
         </div>
     </div>
 
+    <!-- ═══════ MIGRATION DESTINATION PICKER ═══════ -->
+    <div id="migrate-modal" class="lightbox-overlay" style="display:none; align-items:center; justify-content:center; z-index:360;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; width:520px; padding:30px; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
+            <h2 style="margin:0 0 6px; font-size:1.2rem;">📦 Migrate Models</h2>
+            <p id="migrate-file-label" style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">Select a destination for migration.</p>
+            <div style="display:flex; flex-direction:column; gap:15px;">
+                <div>
+                    <label class="section-title">Destination Source</label>
+                    <select id="migrate-dest-source" class="select-fancy" style="width:100%;" onchange="updateMigratePreview()"></select>
+                </div>
+                <div>
+                    <label class="section-title">Model Type Subfolder</label>
+                    <select id="migrate-dest-subdir" class="select-fancy" style="width:100%;" onchange="updateMigratePreview()">
+                        <option value="StableDiffusion">Checkpoints (StableDiffusion)</option>
+                        <option value="Lora">LoRA</option>
+                        <option value="VAE">VAE</option>
+                        <option value="ControlNet">ControlNet</option>
+                        <option value="DiffusionModels">UNET (DiffusionModels)</option>
+                        <option value="TextEncoders">Text Encoders (CLIP/T5)</option>
+                        <option value="Embeddings">Embeddings</option>
+                    </select>
+                </div>
+                <div id="migrate-preview" style="background:var(--bg-color); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.8rem; color:var(--text-muted); word-break:break-all;">Destination: —</div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button id="btn-migrate-cancel" class="btn-base btn-secondary" onclick="document.getElementById('migrate-modal').style.display='none'">Cancel</button>
+                <button id="btn-migrate-confirm" class="btn-base btn-primary" onclick="confirmMigration()" style="background:#6366f1;">Migrate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ EXTERNAL SOURCES PANEL ═══════ -->
+    <div id="sources-modal" class="lightbox-overlay" style="display:none; align-items:center; justify-content:center; z-index:360;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; width:560px; max-height:80vh; overflow-y:auto; padding:30px; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
+            <h2 style="margin:0 0 6px; font-size:1.2rem;">📍 Linked External Sources</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">These are the external model directories currently linked to your vault.</p>
+            <div id="sources-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+            <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+                <button class="btn-base btn-secondary" onclick="document.getElementById('sources-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Inference View -->
     <div id="view-inference" class="view-content" style="display: none; height: calc(100vh - 120px); flex-direction: row; gap: 0; user-select: none;">
 
         <!-- Help Lightbox Modal -->
         <div id="inf-help-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)this.style.display='none';">
             <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; padding:30px; position:relative;">
-                <button onclick="document.getElementById('inf-help-modal').style.display='none'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
+                <button aria-label="Close Help" onclick="document.getElementById(\'inf-help-modal\').style.display=\'none\'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
                 <h2 style="margin:0 0 20px; font-size:1.3rem;">Inference Studio — Guide</h2>
                 <div style="display:flex;flex-direction:column;gap:16px;">
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
@@ -1584,6 +2097,9 @@
             <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 10; border-radius: 12px 12px 0 0;">
                 <h3 style="margin: 0; font-size: 1rem;">Config</h3>
                 <div style="display:flex;gap:8px;align-items:center;">
+                    <button id="inf-save-project-btn" onclick="saveProject()" title="Save Project (.avproj)" style="background:none;border:1px solid var(--border);color:#fbbf24;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">📁</button>
+                    <button id="inf-load-project-btn" onclick="document.getElementById('inf-project-file').click()" title="Open Project (.avproj)" style="background:none;border:1px solid var(--border);color:#a78bfa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">📂</button>
+                    <input type="file" id="inf-project-file" accept=".avproj,.json" style="display:none" onchange="loadProject(this.files[0]); this.value='';">
                     <button onclick="openSavePromptDialog()" title="Save Current Prompt" style="background:none;border:1px solid var(--border);color:#a7f3d0;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">💾</button>
                     <button onclick="togglePromptLibrary()" title="Prompt Library" style="background:none;border:1px solid var(--border);color:#60a5fa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">📚</button>
                     <button onclick="document.getElementById('inf-help-modal').style.display='flex';" title="Help" style="background:none;border:1px solid var(--border);color:var(--text-muted);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">ℹ</button>
@@ -1591,15 +2107,19 @@
                 </div>
             </div>
             <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
-                <!-- Inference Engine -->
+                <!-- Inference Engine (ComfyUI only) -->
                 <div>
                     <label class="section-title">Inference Engine</label>
-                    <select id="inf-engine" class="select-fancy" onchange="onEngineChange(this.value)">
-                        <option value="comfyui">ComfyUI (Default)</option>
-                        <option value="a1111">Automatic1111</option>
-                        <option value="forge">SD WebUI Forge</option>
-                        <option value="fooocus">Fooocus</option>
-                    </select>
+                    <input type="hidden" id="inf-engine" value="comfyui">
+                    <div class="select-fancy" style="pointer-events:none; opacity:0.7; display:flex; align-items:center; gap:8px;">🖥️ ComfyUI</div>
+                </div>
+                <!-- Sprint 13: VRAM Monitor -->
+                <div id="inf-vram-monitor" style="display:none;">
+                    <label class="section-title" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">GPU VRAM <button id="inf-vram-free-btn" onclick="freeComfyVRAM()" style="background:none; border:1px solid var(--border); color:var(--text-muted); padding:2px 8px; border-radius:4px; cursor:pointer; font-size:0.7rem; font-weight:600; transition:all 0.15s;" onmouseenter="this.style.borderColor='#ef4444'; this.style.color='#ef4444';" onmouseleave="this.style.borderColor='var(--border)'; this.style.color='var(--text-muted)';">Free</button></label>
+                    <div style="height:8px; background:var(--bg-color); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
+                        <div id="inf-vram-bar" style="height:100%; width:0%; border-radius:4px; transition:width 0.5s ease, background 0.5s ease; background:linear-gradient(90deg,#4ade80,#22c55e);"></div>
+                    </div>
+                    <div id="inf-vram-text" style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; text-align:right;">— / — GB</div>
                 </div>
                 <!-- Model Type -->
                 <div id="inf-model-type-row">
@@ -1610,7 +2130,27 @@
                         <option value="sdxl">SDXL</option>
                         <option value="flux-dev">FLUX.1-dev</option>
                         <option value="flux-schnell">FLUX.1-schnell</option>
+                        <option value="wan-video-txt">WAN Video (txt2video)</option>
+                        <option value="wan-video-img">WAN Video (img2video)</option>
                     </select>
+                </div>
+                <!-- Phase 5: Video Parameters (shown only in WAN video mode) -->
+                <div id="inf-video-params-row" style="display:none; flex-direction:column; gap:12px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:10px; padding:14px;">
+                    <label class="section-title" style="margin:0; color:#a78bfa;">🎬 Video Parameters</label>
+                    <div style="display:flex; gap:12px;">
+                        <div style="flex:1;">
+                            <label class="section-title" style="font-size:0.75rem;">Frames</label>
+                            <input type="number" id="inf-video-frames" class="select-fancy" value="16" min="4" max="64" step="1" style="width:100%;">
+                        </div>
+                        <div style="flex:1;">
+                            <label class="section-title" style="font-size:0.75rem;">FPS</label>
+                            <input type="number" id="inf-video-fps" class="select-fancy" value="8" min="1" max="30" step="1" style="width:100%;">
+                        </div>
+                        <div style="flex:1;">
+                            <label class="section-title" style="font-size:0.75rem;">Motion</label>
+                            <input type="number" id="inf-video-motion" class="select-fancy" value="1.0" min="0.1" max="3.0" step="0.1" style="width:100%;">
+                        </div>
+                    </div>
                 </div>
                 <!-- SD: Checkpoint -->
                 <div id="inf-sd-model-row">
@@ -1732,6 +2272,28 @@
                     <label class="section-title">CFG Scale</label>
                     <input type="number" id="inf-cfg" class="select-fancy" value="7.0" step="0.5" min="1" max="30">
                 </div>
+                <!-- Sprint 13: Aspect Ratio Presets -->
+                <div id="inf-aspect-row">
+                    <label class="section-title">Aspect Ratio</label>
+                    <div id="inf-aspect-pills" style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <button class="aspect-pill" data-ratio="1:1" onclick="setAspectRatio('1:1', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">1:1</button>
+                        <button class="aspect-pill" data-ratio="3:2" onclick="setAspectRatio('3:2', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">3:2</button>
+                        <button class="aspect-pill" data-ratio="2:3" onclick="setAspectRatio('2:3', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">2:3</button>
+                        <button class="aspect-pill" data-ratio="16:9" onclick="setAspectRatio('16:9', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">16:9</button>
+                        <button class="aspect-pill" data-ratio="9:16" onclick="setAspectRatio('9:16', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">9:16</button>
+                        <button class="aspect-pill" data-ratio="4:3" onclick="setAspectRatio('4:3', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">4:3</button>
+                        <button class="aspect-pill" data-ratio="3:4" onclick="setAspectRatio('3:4', this)" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:var(--text-muted); font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">3:4</button>
+                        <button id="inf-custom-dims-btn" onclick="toggleDimPresetsPopover()" class="aspect-pill" style="padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface-hover); color:#fbbf24; font-size:0.78rem; font-weight:600; cursor:pointer; transition:all 0.15s;">⭐ Custom</button>
+                    </div>
+                    <!-- Custom Dimension Presets Popover -->
+                    <div id="inf-dim-presets-popover" style="display:none; margin-top:8px; background:var(--bg-color); border:1px solid var(--border); border-radius:10px; padding:12px; max-height:200px; overflow-y:auto;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Saved Presets</span>
+                            <button id="inf-add-dim-preset" onclick="addCurrentDimsAsPreset()" style="background:var(--primary); border:none; color:#fff; padding:3px 10px; border-radius:6px; font-size:0.75rem; font-weight:600; cursor:pointer;">+ Save Current</button>
+                        </div>
+                        <div id="inf-dim-preset-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+                    </div>
+                </div>
                 <div id="inf-dimensions-row" style="display: flex; gap: 15px;">
                     <div style="flex: 1; min-width: 0;">
                         <label class="section-title">Width</label>
@@ -1744,10 +2306,22 @@
                 </div>
                 <div id="inf-seed-row">
                     <label class="section-title">Seed</label>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 6px;">
                         <input type="number" id="inf-seed" class="select-fancy" value="-1" style="flex: 1;">
-                        <button onclick="document.getElementById('inf-seed').value = Math.floor(Math.random() * 1e15)" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 15px; border-radius: 8px; cursor: pointer;">🎲</button>
+                        <button onclick="document.getElementById('inf-seed').value = Math.floor(Math.random() * 1e15)" title="Random seed" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 12px; border-radius: 8px; cursor: pointer;">🎲</button>
+                        <button id="inf-seed-lock" onclick="toggleSeedLock()" title="Lock seed" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 10px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">🔓</button>
+                        <button onclick="reuseLastSeed()" title="Reuse last seed" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 10px; border-radius: 8px; cursor: pointer;">♻️</button>
+                        <button onclick="seedVariation(-1)" title="Seed -1" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 8px; border-radius: 8px; cursor: pointer; font-size:0.8rem;">◀</button>
+                        <button onclick="seedVariation(1)" title="Seed +1" style="background: var(--surface-hover); border: 1px solid var(--border); color: #fff; padding: 0 8px; border-radius: 8px; cursor: pointer; font-size:0.8rem;">▶</button>
                     </div>
+                </div>
+                <!-- Sprint 13: Batch Count -->
+                <div id="inf-batch-size-row" style="display:flex; gap:15px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label class="section-title">Batch Count</label>
+                        <input type="number" id="inf-batch-size" class="select-fancy" value="1" min="1" max="8" style="width:100%;">
+                    </div>
+                    <div style="color:var(--text-muted); font-size:0.75rem; padding-bottom:10px;" id="inf-batch-size-hint">1 image per run</div>
                 </div>
 
                 <div id="inf-hires-section" style="border-top: 1px solid var(--border); padding-top: 15px;">
@@ -1817,6 +2391,63 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Phase 5: FaceDetailer Addon Card -->
+                <div id="inf-facedetailer-section" style="border-top: 1px solid var(--border); padding-top: 15px;">
+                    <div id="inf-fd-install-banner" style="display:none; background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(239,68,68,0.1)); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.82rem; color:#fbbf24;">
+                        ⚠️ Impact Pack not detected — <button id="inf-fd-install-btn" onclick="installFaceDetailer()" style="background:#f59e0b; color:#000; border:none; padding:3px 10px; border-radius:4px; font-weight:700; font-size:0.78rem; cursor:pointer; margin-left:4px;">Install Now</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const c=document.getElementById('inf-fd-container');c.style.display=c.style.display==='none'?'flex':'none';">
+                        <label class="section-title" style="margin: 0; cursor: pointer;">😊 FaceDetailer</label>
+                        <input type="checkbox" id="inf-fd-enable" style="transform: scale(1.2); cursor: pointer;" onchange="event.stopPropagation();">
+                    </div>
+                    <div id="inf-fd-container" style="display: none; flex-direction: column; gap: 12px; margin-top: 12px;">
+                        <div>
+                            <label class="section-title" style="font-size:0.78rem;">Detection Model</label>
+                            <select id="inf-fd-bbox-model" class="select-fancy">
+                                <option value="bbox/face_yolov8m.pt">face_yolov8m (recommended)</option>
+                                <option value="bbox/face_yolov8n.pt">face_yolov8n (fast)</option>
+                                <option value="bbox/face_yolov8s.pt">face_yolov8s</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="section-title" style="font-size:0.78rem;">Denoise Strength</label>
+                            <input type="number" id="inf-fd-denoise" class="select-fancy" value="0.4" step="0.05" min="0.0" max="1.0" style="width:100%;">
+                        </div>
+                        <!-- Advanced params (toggleable) -->
+                        <button id="inf-fd-advanced-toggle" onclick="const a=document.getElementById('inf-fd-advanced');a.style.display=a.style.display==='none'?'flex':'none'; this.textContent=a.style.display==='none'?'▸ Show Advanced':'▾ Hide Advanced';" style="background:none; border:none; color:var(--text-muted); font-size:0.78rem; cursor:pointer; text-align:left; padding:0;">▸ Show Advanced</button>
+                        <div id="inf-fd-advanced" style="display:none; flex-direction:column; gap:10px;">
+                            <div style="display:flex; gap:10px;">
+                                <div style="flex:1;"><label class="section-title" style="font-size:0.72rem;">Guide Size</label><input type="number" id="inf-fd-guide-size" class="select-fancy" value="384" min="128" max="1024" step="64" style="width:100%;"></div>
+                                <div style="flex:1;"><label class="section-title" style="font-size:0.72rem;">Feather</label><input type="number" id="inf-fd-feather" class="select-fancy" value="5" min="0" max="50" style="width:100%;"></div>
+                            </div>
+                            <div style="display:flex; gap:10px;">
+                                <div style="flex:1;"><label class="section-title" style="font-size:0.72rem;">Max Faces</label><input type="number" id="inf-fd-max-faces" class="select-fancy" value="10" min="1" max="50" style="width:100%;"></div>
+                                <div style="flex:1;"><label class="section-title" style="font-size:0.72rem;">Cycles</label><input type="number" id="inf-fd-cycle" class="select-fancy" value="1" min="1" max="5" style="width:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 5: LayerDiffuse Addon Card -->
+                <div id="inf-layerdiffuse-section" style="border-top: 1px solid var(--border); padding-top: 15px; padding-bottom: 15px;">
+                    <div id="inf-ld-install-banner" style="display:none; background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(236,72,153,0.1)); border:1px solid rgba(139,92,246,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.82rem; color:#a78bfa;">
+                        ⚠️ LayerDiffuse not detected — <button id="inf-ld-install-btn" onclick="installLayerDiffuse()" style="background:#8b5cf6; color:#fff; border:none; padding:3px 10px; border-radius:4px; font-weight:700; font-size:0.78rem; cursor:pointer; margin-left:4px;">Install Now</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const c=document.getElementById('inf-ld-container');c.style.display=c.style.display==='none'?'flex':'none';">
+                        <label class="section-title" style="margin: 0; cursor: pointer;">🫥 LayerDiffuse (Transparent)</label>
+                        <input type="checkbox" id="inf-ld-enable" style="transform: scale(1.2); cursor: pointer;" onchange="event.stopPropagation();">
+                    </div>
+                    <div id="inf-ld-container" style="display: none; flex-direction: column; gap: 12px; margin-top: 12px;">
+                        <div>
+                            <label class="section-title" style="font-size:0.78rem;">Method</label>
+                            <select id="inf-ld-method" class="select-fancy">
+                                <option value="SDXL Transparent">SDXL Transparent</option>
+                                <option value="SD15 Transparent">SD 1.5 Transparent</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
             </div>
         </div>
@@ -1830,16 +2461,41 @@
         <div id="inf-col-mid" style="width: 340px; min-width:200px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding: 0 10px; flex-shrink:0;">
             <!-- Prompts -->
             <div style="background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column;">
-                <label class="section-title">Prompt</label>
-                <textarea id="inf-prompt" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit; margin-bottom: 4px;" placeholder="masterpiece, best quality, highly detailed..." oninput="updateTokenCounter()"></textarea>
+                <label class="section-title">Prompt <span style="font-size:0.7rem; color:var(--text-muted); font-weight:400;">(Ctrl+↑↓ emphasis · {a|b|c} wildcards)</span></label>
+                <div class="prompt-editor-container">
+                    <div id="inf-prompt-highlight" class="prompt-highlight-layer" aria-hidden="true"></div>
+                    <textarea id="inf-prompt" class="prompt-textarea" placeholder="masterpiece, best quality, highly detailed..." oninput="updateTokenCounter(); updatePromptHighlight('inf-prompt')"></textarea>
+                </div>
                 <div class="token-counter green" id="inf-token-counter"><span class="count" id="inf-token-count">0</span><span style="color:var(--text-muted)"> / <span id="inf-token-limit">77</span> tokens</span></div>
-                <!-- Sprint 12: Ollama Prompt Enhancement -->
+                <!-- Sprint 12: Ollama Prompt Enhancement with Feel -->
                 <div style="display:flex; gap:6px; align-items:center; margin: 6px 0;">
-                    <button id="ollama-enhance-btn" onclick="enhancePromptWithOllama()" style="flex:1; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px;" onmouseenter="this.style.transform='scale(1.02)'" onmouseleave="this.style.transform='scale(1)'">✨ Enhance with AI</button>
+                    <button id="ollama-enhance-btn" onclick="enhancePromptWithOllamaFeel()" style="flex:1; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px;" onmouseenter="this.style.transform='scale(1.02)'" onmouseleave="this.style.transform='scale(1)'">✨ Enhance with AI</button>
+                    <div style="position:relative;">
+                        <button id="ollama-feel-btn" onclick="toggleFeelDropdown()" style="background:var(--surface-hover); color:#e2e8f0; border:1px solid var(--border); padding:8px 10px; border-radius:8px; font-size:0.78rem; cursor:pointer; white-space:nowrap;" title="AI Enhancement Style">🎨 Default</button>
+                        <div id="ollama-feel-dropdown" style="display:none; position:absolute; top:100%; right:0; z-index:80; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:6px; margin-top:4px; width:160px;"></div>
+                    </div>
                     <span id="ollama-status-dot" style="width:10px; height:10px; border-radius:50%; background:#ef4444; flex-shrink:0;" title="Ollama: Offline"></span>
                 </div>
+                <!-- Feature 10: Prompt Style Presets + Feature 14: Seed Variations -->
+                <div style="position:relative; margin-bottom:6px;">
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="togglePromptPresets()" style="flex:1; background:var(--surface-hover); color:#e2e8f0; border:1px solid var(--border); padding:6px 12px; border-radius:8px; font-size:0.78rem; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:4px;" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border)'">📑 Presets</button>
+                        <button onclick="saveCurrentAsPreset()" style="background:var(--surface-hover); color:var(--text-muted); border:1px solid var(--border); padding:6px 12px; border-radius:8px; font-size:0.78rem; cursor:pointer; transition:all 0.15s;" onmouseenter="this.style.borderColor='var(--primary)';this.style.color='#fff'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">+ Save Current</button>
+                        <button onclick="generateSeedVariations()" style="background:var(--surface-hover); color:var(--text-muted); border:1px solid var(--border); padding:6px 12px; border-radius:8px; font-size:0.78rem; cursor:pointer; transition:all 0.15s;" onmouseenter="this.style.borderColor='var(--primary)';this.style.color='#fff'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'" title="Generate N variations with different seeds">🌱 Variations</button>
+                    </div>
+                    <div id="inf-prompt-presets-popover" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:80; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:8px; margin-top:4px; max-height:240px; overflow-y:auto;">
+                        <div id="inf-prompt-presets-list"></div>
+                    </div>
+                </div>
+                <!-- Keyboard shortcuts hint -->
+                <div style="font-size:0.65rem; color:var(--text-muted); margin-bottom:4px; opacity:0.7;">
+                    ⌨️ Ctrl+Enter Generate · Ctrl+S Save · Ctrl+Shift+R Random Seed · Ctrl+Shift+V Seed +1
+                </div>
                 <div id="inf-sd-neg-row" style="display: flex; flex-direction: column;"><label class="section-title">Negative Prompt</label>
-                <textarea id="inf-negative" style="flex: 1; outline: none; background: var(--bg-color); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; resize: vertical; min-height: 100px; font-size: 1rem; font-family: inherit; width: 100%; box-sizing: border-box;" placeholder="worst quality, low quality, blurry..."></textarea></div>
+                <div class="prompt-editor-container">
+                    <div id="inf-negative-highlight" class="prompt-highlight-layer" aria-hidden="true"></div>
+                    <textarea id="inf-negative" class="prompt-textarea" placeholder="worst quality, low quality, blurry..." oninput="updatePromptHighlight('inf-negative')"></textarea>
+                </div></div>
                 
                 <div style="margin-top: 20px;">
                     <label class="section-title">Image-to-Image (Optional)</label>
@@ -1872,19 +2528,40 @@
         <div id="inf-col-right" style="flex: 1; min-width:200px; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
             <!-- Generate button above canvas -->
             <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink:0;">
+                <!-- Row 1: Generate button (full width) -->
                 <div style="display:flex; gap:8px;">
                     <button class="btn-download" id="inf-generate-btn" onclick="executeInference()" style="position: relative; overflow: hidden; height: 50px; font-size: 1.1rem; flex:1;">
                         <div id="inf-progress-fill" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: rgba(59, 130, 246, 0.4); transition: width 0.1s linear; pointer-events: none;"></div>
-                        <span id="inf-generate-text" style="position: relative; z-index: 2;">Generate Image</span>
+                        <span id="inf-generate-text" style="position: relative; z-index: 2;">🎨 Generate Image</span>
                     </button>
                     <!-- IS-11: Cancel Generation Button (hidden by default) -->
                     <button id="inf-cancel-btn" onclick="cancelInference()" style="display:none; height:50px; width:50px; flex-shrink:0; background:#ef4444; border:none; border-radius:8px; color:#fff; font-size:1.3rem; cursor:pointer; transition:all 0.15s;" title="Cancel Generation" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">🛑</button>
-                    <button id="inf-inpaint-toggle" onclick="toggleInpaintMode()" style="height:50px; width:50px; flex-shrink:0; background:var(--surface-hover); border:1px solid var(--border); border-radius:8px; color:#94a3b8; font-size:1.3rem; cursor:pointer; transition:all 0.15s;" title="Toggle Inpaint Mode">🖌️</button>
-                    <button id="inf-region-toggle" onclick="toggleRegionMode()" style="height:50px; width:50px; flex-shrink:0; background:var(--surface-hover); border:1px solid var(--border); border-radius:8px; color:#94a3b8; font-size:1.1rem; cursor:pointer; transition:all 0.15s;" title="Regional Prompting">📐</button>
-                    <button id="inf-batch-add-btn" onclick="addToBatchQueue()" style="height:50px; width: 50px; flex-shrink:0; background:linear-gradient(135deg,#6366f1,#8b5cf6); border:none; border-radius:8px; color:#fff; font-size:1.3rem; cursor:pointer; transition:transform 0.15s;" title="Add to Batch Queue" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">+⏳</button>
                 </div>
-                <div style="display:flex; justify-content:flex-end; margin-top:6px;">
-                    <button id="inf-batch-toggle" onclick="toggleBatchPanel()" style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; padding:2px 6px;">Queue (<span id="inf-batch-count">0</span>)</button>
+                <!-- Row 2: Tool buttons with labels -->
+                <div style="display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                    <button id="inf-inpaint-toggle" class="tool-btn" onclick="toggleInpaintMode()" title="Toggle Inpaint Mode">
+                        <span class="tool-icon">🖌️</span><span class="tool-label">Inpaint</span>
+                    </button>
+                    <button id="inf-region-toggle" class="tool-btn" onclick="toggleRegionMode()" title="Regional Prompting">
+                        <span class="tool-icon">📐</span><span class="tool-label">Regions</span>
+                    </button>
+                    <button id="inf-compare-toggle" class="tool-btn" onclick="toggleCompareMode()" title="Before / After Comparison (C)" disabled>
+                        <span class="tool-icon">🔀</span><span class="tool-label">Compare</span>
+                    </button>
+                    <div style="flex:1;"></div>
+                    <button id="inf-batch-add-btn" class="tool-btn" onclick="addToBatchQueue()" style="background:linear-gradient(135deg,#6366f1,#8b5cf6); border-color:transparent; color:#fff;" title="Add to Batch Queue">
+                        <span class="tool-icon">+⏳</span><span class="tool-label">Batch</span>
+                    </button>
+                    <button id="inf-import-workflow-btn" class="tool-btn" onclick="document.getElementById('inf-workflow-file').click()" title="Import Custom ComfyUI Workflow (.json)">
+                        <span class="tool-icon">⚡</span><span class="tool-label">Workflow</span>
+                    </button>
+                    <input type="file" id="inf-workflow-file" accept=".json" style="display:none" onchange="importCustomWorkflow(this.files[0]); this.value='';">
+                    <button id="inf-batch-toggle" onclick="toggleBatchPanel()" style="background:none; border:1px solid var(--border); color:var(--text-muted); font-size:0.78rem; cursor:pointer; padding:4px 10px; border-radius:8px; transition:all 0.15s;" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border)'">Queue (<span id="inf-batch-count">0</span>)</button>
+                </div>
+                <!-- Row 3: Mode Banner (hidden by default) -->
+                <div id="inf-mode-banner" class="mode-banner">
+                    <span id="inf-mode-banner-text"></span>
+                    <button class="mode-exit-btn" id="inf-mode-exit-btn" onclick="exitActiveMode()">✕ Exit</button>
                 </div>
             </div>
             <!-- Sprint 12: Generation Progress Bar -->
@@ -1905,12 +2582,47 @@
                     <div class="separator"></div>
                     <div class="brush-size-ctrl">
                         <span>Size</span>
-                        <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" oninput="window._inpaintBrushSize=+this.value;">
+                        <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" oninput="window._inpaintBrushSize=+this.value; updateBrushCursor();">
                         <span id="inpaint-brush-size-label">30</span>
                     </div>
                     <div class="separator"></div>
+                    <div class="opacity-ctrl">
+                        <span>Opacity</span>
+                        <input type="range" id="inpaint-opacity" min="20" max="90" value="55" oninput="window._inpaintOpacity=+this.value/100; document.getElementById('inpaint-opacity-label').textContent=this.value+'%';">
+                        <span id="inpaint-opacity-label">55%</span>
+                    </div>
+                    <div class="separator"></div>
+                    <button id="inpaint-undo-btn" onclick="undoInpaint()" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
+                    <button id="inpaint-redo-btn" onclick="redoInpaint()" title="Redo (Ctrl+Shift+Z)" disabled>↪️ Redo</button>
+                    <div class="separator"></div>
                     <button onclick="invertInpaintMask()" title="Invert Mask">🔄 Invert</button>
                     <button onclick="clearInpaintMask()" title="Clear Mask">🗑️ Clear</button>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="Inpaint denoise strength — lower preserves original, higher allows creative freedom">
+                        <span class="fine-label">Denoise</span>
+                        <input type="range" id="inpaint-denoise" min="0" max="100" value="75" oninput="window._inpaintDenoise=+this.value/100; document.getElementById('inpaint-denoise-label').textContent=(+this.value/100).toFixed(2);">
+                        <span class="fine-value" id="inpaint-denoise-label">0.75</span>
+                    </div>
+                    <div class="fine-ctrl" title="Mask edge blur radius in pixels">
+                        <span class="fine-label">Blur</span>
+                        <input type="range" id="inpaint-mask-blur" min="0" max="20" value="4" oninput="window._inpaintMaskBlur=+this.value; document.getElementById('inpaint-blur-label').textContent=this.value+'px';">
+                        <span class="fine-value" id="inpaint-blur-label">4px</span>
+                    </div>
+                    <div class="fine-ctrl" title="Expand (+) or contract (-) the mask boundary in pixels">
+                        <span class="fine-label">Padding</span>
+                        <input type="range" id="inpaint-mask-padding" min="-20" max="20" value="0" oninput="window._inpaintMaskPadding=+this.value; document.getElementById('inpaint-padding-label').textContent=(this.value>0?'+':'')+this.value+'px';">
+                        <span class="fine-value" id="inpaint-padding-label">0px</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="How to fill the masked area before diffusion">
+                        <span class="fine-label">Fill</span>
+                        <select id="inpaint-fill-mode" onchange="window._inpaintFillMode=this.value;">
+                            <option value="original" selected>Original</option>
+                            <option value="noise">Noise</option>
+                            <option value="fill">Fill</option>
+                            <option value="latent_noise">Latent Noise</option>
+                        </select>
+                    </div>
                 </div>
                 <!-- Sprint 12: Outpainting Direction Buttons -->
                 <div class="outpaint-controls" id="outpaint-controls">
@@ -1918,19 +2630,72 @@
                     <button class="outpaint-btn down" onclick="outpaint('down')" title="Extend Down">↓</button>
                     <button class="outpaint-btn left" onclick="outpaint('left')" title="Extend Left">←</button>
                     <button class="outpaint-btn right" onclick="outpaint('right')" title="Extend Right">→</button>
+                    <div class="outpaint-size-selector">
+                        <button class="outpaint-size-btn" onclick="setOutpaintSize(128, this)">128</button>
+                        <button class="outpaint-size-btn active" onclick="setOutpaintSize(256, this)">256</button>
+                        <button class="outpaint-size-btn" onclick="setOutpaintSize(512, this)">512</button>
+                    </div>
+                </div>
+                <!-- Phase 1: Brush Cursor (follows mouse in inpaint mode) -->
+                <div id="brush-cursor"></div>
+                <!-- Phase 1: Before/After Compare Overlay -->
+                <div class="compare-overlay" id="compare-overlay">
+                    <img class="compare-before-img" id="compare-before-img" src="" alt="Before">
+                    <img class="compare-after-img" id="compare-after-img" src="" alt="After">
+                    <div class="compare-divider" id="compare-divider" style="left:50%;"></div>
+                    <span class="compare-pane-label before" id="compare-label-before">BEFORE</span>
+                    <span class="compare-pane-label after" id="compare-label-after">AFTER</span>
+                    <div class="compare-toolbar" id="compare-toolbar">
+                        <button id="compare-flip-btn" onclick="flipCompareImages()" title="Swap Before / After">🔀 Flip</button>
+                        <div class="separator"></div>
+                        <button id="compare-sbs-btn" onclick="toggleCompareSideBySide()" title="Toggle Side-by-Side">◫ Side-by-Side</button>
+                        <div class="separator"></div>
+                        <button onclick="toggleCompareMode()" title="Exit Compare">✕ Close</button>
+                    </div>
                 </div>
                 <!-- Sprint 12: Regional Prompting Zone Editor -->
                 <div class="region-editor" id="region-editor"></div>
                 <div class="region-toolbar" id="region-toolbar">
                     <button onclick="addRegionZone()" title="Add Zone">➕ Add Zone</button>
                     <div class="separator"></div>
+                    <div class="layout-presets">
+                        <button class="layout-preset-btn" onclick="applyRegionLayout('2col')" title="2-Column Split"><svg viewBox="0 0 18 14"><rect x="1" y="1" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="10" y="1" width="7" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+                        <button class="layout-preset-btn" onclick="applyRegionLayout('3col')" title="3-Column Split"><svg viewBox="0 0 18 14"><rect x="1" y="1" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="6.75" y="1" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="12.5" y="1" width="4.5" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+                        <button class="layout-preset-btn" onclick="applyRegionLayout('2row')" title="Top / Bottom Split"><svg viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="1" y="8" width="16" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+                        <button class="layout-preset-btn" onclick="applyRegionLayout('2x2')" title="2×2 Grid"><svg viewBox="0 0 18 14"><rect x="1" y="1" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="10" y="1" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="1" y="8" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/><rect x="10" y="8" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+                    </div>
+                    <div class="separator"></div>
                     <span class="zone-count" id="region-zone-count">0 zones</span>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="How strongly the root prompt influences all regions (0 = regions only, >0 = blend with root)">
+                        <span class="fine-label">Base</span>
+                        <input type="range" id="region-base-ratio" min="0" max="100" value="0" oninput="window._regionBaseRatio=+this.value/100; document.getElementById('region-base-label').textContent=(+this.value/100).toFixed(1);">
+                        <span class="fine-value" id="region-base-label">0.0</span>
+                    </div>
                     <div class="separator"></div>
                     <button onclick="clearAllRegions()" title="Clear All Zones">🗑️ Clear</button>
                 </div>
             </div>
+            <!-- Phase 2: Edit Timeline Strip -->
+            <div class="edit-timeline" id="edit-timeline">
+                <div class="edit-timeline-header">
+                    <span class="timeline-title">⏳ EDIT TIMELINE <span id="edit-timeline-count"></span></span>
+                    <div class="timeline-nav">
+                        <button id="edit-prev-btn" onclick="stepEditHistory(-1)" title="Previous step ([)" disabled>◀</button>
+                        <span id="edit-step-label" style="font-size:0.7rem; color:var(--text-muted); min-width:40px; text-align:center;"></span>
+                        <button id="edit-next-btn" onclick="stepEditHistory(1)" title="Next step (])" disabled>▶</button>
+                    </div>
+                </div>
+                <div class="edit-timeline-strip" id="edit-timeline-strip"></div>
+            </div>
             <!-- Gallery strip -->
-            <div style="height: 130px; border-top: 1px solid var(--border); padding: 10px; display: flex; gap: 10px; overflow-x: auto; background: var(--surface-hover); flex-shrink:0;" id="inf-gallery">
+            <div style="border-top: 1px solid var(--border); background: var(--surface-hover); flex-shrink:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px 0;">
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">SESSION GALLERY</span>
+                    <button id="inf-grid-btn" onclick="assembleSessionGrid()" title="Assemble all session images into a grid" style="background:none; border:1px solid var(--border); border-radius:6px; padding:3px 8px; color:var(--text-muted); font-size:0.75rem; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:4px;" onmouseenter="this.style.borderColor='var(--primary)';this.style.color='#fff'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">🖼️ Grid</button>
+                </div>
+                <div style="height: 110px; padding: 6px 10px 10px; display: flex; gap: 10px; overflow-x: auto;" id="inf-gallery">
+                </div>
             </div>
         </div>
     </div>
@@ -2194,8 +2959,19 @@
             <button onclick="runXYZPlot()" class="btn-download" style="width:100%; height: 44px; font-size:1rem; margin-top: 10px;">⚡ Run X/Y/Z Plot</button>
             <div id="xyz-status" style="color:var(--text-muted); font-size:0.82rem; text-align:center; margin-top:8px;"></div>
             <div class="xyz-grid-container" id="xyz-grid" style="display:none;"></div>
+            <button id="xyz-restore-btn" onclick="restoreLastXYZGrid()" style="width:100%; margin-top:8px; height:36px; background:var(--surface-hover); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-size:0.85rem; cursor:pointer; display:none;" onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border)'">📋 Restore Last Grid</button>
+            <script>
+                // Show restore button only if a previous grid exists in sessionStorage
+                document.addEventListener('DOMContentLoaded', () => {
+                    if (sessionStorage.getItem('xyz_last_grid')) {
+                        const btn = document.getElementById('xyz-restore-btn');
+                        if (btn) btn.style.display = '';
+                    }
+                });
+            </script>
         </div>
     </div>
 
+</main>
 </body>
 </html>

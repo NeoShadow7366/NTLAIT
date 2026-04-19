@@ -85,11 +85,6 @@
         }
         
         async function uploadFileToProxy(file) {
-            // BUG-6 fix: Only ComfyUI requires server-side file upload.
-            // A1111/Forge use base64 inline in the payload — skip upload to avoid errors.
-            const engine = document.getElementById('inf-engine')?.value || 'comfyui';
-            if (engine !== 'comfyui') return null;
-
             document.getElementById('inf-generate-btn').disabled = true;
             document.getElementById('inf-generate-text').innerText = "Uploading Image to Engine...";
             
@@ -102,7 +97,7 @@
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return data.name; 
             } catch(e) {
-                alert("Engine upload failed! Is ComfyUI running?");
+                showToast('❌ Engine upload failed! Is ComfyUI running?');
                 document.getElementById('inf-generate-btn').disabled = false;
                 document.getElementById('inf-generate-text').innerText = "Generate Image";
                 return null;
@@ -115,12 +110,23 @@
 
         function onModelTypeChange(type) {
             const isFlux = type==='flux-dev'||type==='flux-schnell';
-            SD_ONLY_IDS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=isFlux?'none':''; });
-            FLUX_ONLY_IDS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=isFlux?'':'none'; });
+            const isVideo = type==='wan-video-txt'||type==='wan-video-img';
+            SD_ONLY_IDS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=(isFlux||isVideo)?'none':''; });
+            FLUX_ONLY_IDS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=(isFlux||isVideo)?'':'none'; });
             const gRow=document.getElementById('inf-flux-guidance-row');
             if(gRow) gRow.style.display=(type==='flux-dev')?'':'none';
+            // Phase 5: Video params visibility
+            const vRow=document.getElementById('inf-video-params-row');
+            if(vRow) vRow.style.display=isVideo?'flex':'none';
+            // Phase 5: Hide hires/batch/controlnet for video mode (not applicable)
+            const hiresSection=document.getElementById('inf-hires-section');
+            if(hiresSection) hiresSection.style.display=isVideo?'none':'';
+            const batchRow=document.getElementById('inf-batch-size-row');
+            if(batchRow) batchRow.style.display=isVideo?'none':'';
+            // Smart defaults
             if(type==='flux-schnell') document.getElementById('inf-steps').value=4;
             if(type==='flux-dev') document.getElementById('inf-steps').value=20;
+            if(isVideo) { document.getElementById('inf-steps').value=30; }
         }
 
         function autoDetectModelType(filename) {
@@ -138,78 +144,37 @@
         }
 
         function onEngineChange(engine) {
-            console.log("Switched inference engine to: " + engine);
+            console.log("Inference engine: ComfyUI");
             
-            // Reset launch button state for new engine
+            // Reset launch button state
             const btn = document.getElementById('inf-launch-btn');
             btn.innerText = 'Launch Engine';
             btn.style.color = '#cbd5e1';
             btn.onclick = launchActiveEngine;
             window.engineLaunching = false;
-            // I-11 fix: Clear stale ComfyUI img2img reference when switching engines
             window.comfyUploadedImg2Img = null;
             
-            // Apply engine-specific UI visibility
-            applyEngineVisibility(engine);
-            
-            // Probe engine connectivity
-            const probes = {
-                comfyui:  { proxy: '/api/comfy_proxy',   body: {endpoint: '/system_stats'} },
-                a1111:    { proxy: '/api/a1111_proxy',    body: {endpoint: '/sdapi/v1/options'} },
-                forge:    { proxy: '/api/forge_proxy',    body: {endpoint: '/sdapi/v1/options'} },
-                fooocus:  { proxy: '/api/fooocus_proxy',  body: {endpoint: '/'} }
-            };
-            const probe = probes[engine];
-            if(probe) {
-                btn.innerText = 'Checking...';
-                btn.style.color = '#fbbf24';
-                fetch(probe.proxy, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(probe.body)
-                }).then(res => {
-                    if(res.ok) {
-                        btn.innerText = 'Backend Connected 🟢';
-                        btn.style.color = '#4ade80';
-                    } else throw new Error('offline');
-                }).catch(() => {
-                    btn.innerText = 'Launch Engine';
-                    btn.style.color = '#cbd5e1';
-                });
-            }
+            // Probe ComfyUI connectivity
+            btn.innerText = 'Checking...';
+            btn.style.color = '#fbbf24';
+            fetch('/api/comfy_proxy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({endpoint: '/system_stats'})
+            }).then(res => {
+                if(res.ok) {
+                    btn.innerText = 'Backend Connected 🟢';
+                    btn.style.color = '#4ade80';
+                } else throw new Error('offline');
+            }).catch(() => {
+                btn.innerText = 'Launch Engine';
+                btn.style.color = '#cbd5e1';
+            });
         }
 
-        /* ═══ Engine-Specific UI Visibility ═══ */
+        /* ═══ Engine-Specific UI Visibility (ComfyUI-only — all rows visible) ═══ */
         function applyEngineVisibility(engine) {
-            // All toggleable row IDs in the Config panel
-            const allRows = [
-                'inf-model-type-row', 'inf-sd-model-row', 'inf-sd-refiner-row',
-                'inf-vae-row', 'inf-lora-section', 'inf-sampler-row',
-                'inf-scheduler-row', 'inf-steps-row', 'inf-sd-cfg-row',
-                'inf-dimensions-row', 'inf-seed-row', 'inf-hires-section',
-                'inf-sd-cn-row'
-            ];
-
-            // Per-engine: which rows to HIDE (everything else stays visible)
-            const hideMap = {
-                comfyui: [],
-                a1111:  ['inf-scheduler-row', 'inf-vae-row', 'inf-sd-refiner-row'],
-                forge:  ['inf-scheduler-row', 'inf-vae-row', 'inf-sd-refiner-row'],
-                fooocus: [
-                    'inf-model-type-row', 'inf-sd-model-row', 'inf-sd-refiner-row',
-                    'inf-vae-row', 'inf-lora-section', 'inf-sampler-row',
-                    'inf-scheduler-row', 'inf-steps-row', 'inf-sd-cfg-row',
-                    'inf-dimensions-row', 'inf-seed-row', 'inf-hires-section',
-                    'inf-sd-cn-row'
-                ]
-            };
-
-            const toHide = new Set(hideMap[engine] || []);
-
-            allRows.forEach(id => {
-                const el = document.getElementById(id);
-                if(el) el.style.display = toHide.has(id) ? 'none' : '';
-            });
+            // ComfyUI shows all config rows — no hiding needed
         }
 
         // executeFluxInference logic moved to server backend
@@ -225,7 +190,7 @@
                     const file = new File([blob], 'gallery_image.' + ext, { type: blob.type });
                     await handleImg2ImgUploadFile(file);
                 } catch(err) {
-                    alert('Failed to load gallery image: ' + err.message);
+                    showToast('❌ Failed to load gallery image: ' + err.message);
                 }
                 return;
             }
@@ -387,16 +352,17 @@
 
         /* --- Persistent Gallery: Save to DB + Update UI --- */
         async function saveToGallery(imgUrl, workflow) {
-            // Extract metadata from UI for cleaner gallery storage
-            const prompt = document.getElementById('inf-prompt').value;
-            const negative = document.getElementById('inf-negative').value;
-            const model = document.getElementById('inf-model').value;
-            const seed = parseInt(document.getElementById('inf-seed').value);
-            const steps = parseInt(document.getElementById('inf-steps').value);
-            const cfg = parseFloat(document.getElementById('inf-cfg').value);
-            const sampler = document.getElementById('inf-sampler').value;
-            const width = parseInt(document.getElementById('inf-width').value);
-            const height = parseInt(document.getElementById('inf-height').value);
+            // Audit #9: Use frozen payload object instead of live DOM values
+            // This prevents metadata drift if user changes sliders during generation
+            const prompt = workflow.prompt || document.getElementById('inf-prompt').value;
+            const negative = workflow.negative_prompt || document.getElementById('inf-negative').value;
+            const model = workflow.override_settings?.sd_model_checkpoint || document.getElementById('inf-model').value;
+            const seed = workflow.seed ?? parseInt(document.getElementById('inf-seed').value);
+            const steps = workflow.steps ?? parseInt(document.getElementById('inf-steps').value);
+            const cfg = workflow.cfg_scale ?? parseFloat(document.getElementById('inf-cfg').value);
+            const sampler = workflow.sampler_name || document.getElementById('inf-sampler').value;
+            const width = workflow.width ?? parseInt(document.getElementById('inf-width').value);
+            const height = workflow.height ?? parseInt(document.getElementById('inf-height').value);
 
             const payload = {
                 image_path: imgUrl,
@@ -410,6 +376,14 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(payload)
                 });
+
+                // Feature 6: Fire-and-forget PNG metadata embedding
+                // Embeds A1111-compatible tEXt chunks for external tool compatibility
+                if (typeof embedMetadataInImage === 'function') {
+                    embedMetadataInImage(imgUrl, workflow).then(savedPath => {
+                        if (savedPath) console.debug('[Meta] Embedded metadata →', savedPath);
+                    }).catch(() => {});
+                }
             } catch(e) {
                 console.warn("Failed to save to gallery DB:", e);
             }
@@ -452,6 +426,14 @@
 
             // 2. Persist to DB
             saveToGallery(imgUrl, promptObj);
+
+            // Phase 2: Record in edit history timeline
+            if (typeof addEditHistoryEntry === 'function') {
+                const label = promptObj?.prompt
+                    ? promptObj.prompt.substring(0, 40) + (promptObj.prompt.length > 40 ? '…' : '')
+                    : 'Generation';
+                addEditHistoryEntry(imgUrl, promptObj, label);
+            }
         }
 
         /* --- Gallery Drop on Canvas: show image + restore settings --- */
@@ -467,7 +449,13 @@
             if(promptStr) {
                 try { repopulateUI(JSON.parse(promptStr)); } catch(ex) {}
             } else if(e.dataTransfer.files && e.dataTransfer.files.length) {
-                restoreMetadataFromDrop(e);
+                // Task 2.1: Route .json files to custom workflow import
+                const droppedFile = e.dataTransfer.files[0];
+                if (droppedFile.name.endsWith('.json')) {
+                    importCustomWorkflow(droppedFile);
+                } else {
+                    restoreMetadataFromDrop(e);
+                }
             }
         }
 
@@ -565,6 +553,8 @@
             
             // IS-13: Stop Ollama polling when leaving Inference tab
             if (tabId !== 'inference' && typeof stopOllamaPolling === 'function') stopOllamaPolling();
+            // Sprint 13: Stop VRAM polling when leaving Inference tab
+            if (tabId !== 'inference' && typeof stopVRAMPolling === 'function') stopVRAMPolling();
             
             if(tabId === 'dashboard') {
                 document.getElementById('view-dashboard').style.display = 'block';
@@ -583,6 +573,8 @@
                 initInferenceUI();
                 // IS-13: Start Ollama polling only when Inference tab is active
                 if (typeof startOllamaPolling === 'function') startOllamaPolling();
+                // Sprint 13: Start VRAM polling only when Inference tab is active
+                if (typeof startVRAMPolling === 'function') startVRAMPolling();
             } else if(tabId === 'vault') {
                 document.getElementById('view-vault').style.display = 'block';
                 document.getElementById('page-title').innerText = 'Global Vault';
@@ -611,4 +603,172 @@
             }
         }
 
+        /* ═══ Sprint 13: Aspect Ratio Presets ═══════════════════════ */
+        const _ASPECT_RESOLUTIONS = {
+            // { ratio: { sd: [w,h], sdxl: [w,h] } }  — FLUX uses SDXL table
+            '1:1':  { sd: [512, 512],  sdxl: [1024, 1024] },
+            '3:2':  { sd: [768, 512],  sdxl: [1216,  832] },
+            '2:3':  { sd: [512, 768],  sdxl: [ 832, 1216] },
+            '16:9': { sd: [896, 512],  sdxl: [1344,  768] },
+            '9:16': { sd: [512, 896],  sdxl: [ 768, 1344] },
+            '4:3':  { sd: [640, 512],  sdxl: [1152,  896] },
+            '3:4':  { sd: [512, 640],  sdxl: [ 896, 1152] }
+        };
+
+        function setAspectRatio(ratio, el) {
+            const modelType = document.getElementById('inf-model-type')?.value || 'sdxl';
+            const table = _ASPECT_RESOLUTIONS[ratio];
+            if (!table) return;
+            // SD 1.5 uses 'sd' table, everything else (sdxl, flux-dev, flux-schnell) uses 'sdxl'
+            const key = modelType === 'sd' ? 'sd' : 'sdxl';
+            const [w, h] = table[key];
+            document.getElementById('inf-width').value = w;
+            document.getElementById('inf-height').value = h;
+            // Highlight active pill
+            document.querySelectorAll('.aspect-pill').forEach(p => {
+                p.style.background = 'var(--surface-hover)';
+                p.style.color = 'var(--text-muted)';
+                p.style.borderColor = 'var(--border)';
+            });
+            if (el) {
+                el.style.background = 'var(--primary)';
+                el.style.color = '#fff';
+                el.style.borderColor = 'var(--primary)';
+            }
+            // Audit #6: Track active ratio for model-type change re-application
+            window._activeAspectRatio = ratio;
+            window._activeAspectPill = el;
+        }
+
+        // Audit #6: Re-apply active aspect ratio when model type changes
+        document.addEventListener('DOMContentLoaded', () => {
+            const modelTypeSel = document.getElementById('inf-model-type');
+            if (modelTypeSel) {
+                modelTypeSel.addEventListener('change', () => {
+                    if (window._activeAspectRatio) {
+                        setAspectRatio(window._activeAspectRatio, window._activeAspectPill);
+                    }
+                });
+            }
+        });
+
+        /* ═══ Sprint 13: Batch Count Hint Updater ══════════════════ */
+        document.addEventListener('DOMContentLoaded', () => {
+            const batchInput = document.getElementById('inf-batch-size');
+            const hint = document.getElementById('inf-batch-size-hint');
+            if (batchInput && hint) {
+                batchInput.addEventListener('input', () => {
+                    // Audit #13: Clamp input value and update the field to prevent UI/backend mismatch
+                    const raw = parseInt(batchInput.value) || 1;
+                    const n = Math.max(1, Math.min(8, raw));
+                    if (raw !== n) batchInput.value = n;
+                    hint.textContent = n === 1 ? '1 image per run' : `${n} images per run`;
+                });
+            }
+        });
+
+        /* ═══ Sprint 13: VRAM Monitor + Free ═══════════════════════ */
+        window._vramPollInterval = null;
+
+        // Task 1.1: Shared ComfyUI system_stats fetch with 5s TTL dedup
+        // Eliminates redundant /system_stats calls from VRAM polling + engine probe
+        let _comfyStatsCache = null, _comfyStatsPromise = null, _comfyStatsTime = 0;
+        async function fetchComfySystemStats() {
+            const now = Date.now();
+            if (_comfyStatsCache && now - _comfyStatsTime < 5000) return _comfyStatsCache;
+            if (_comfyStatsPromise) return _comfyStatsPromise;
+            _comfyStatsPromise = fetch('/api/comfy_proxy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({endpoint: '/system_stats'})
+            }).then(r => r.ok ? r.json() : null).catch(() => null);
+            _comfyStatsCache = await _comfyStatsPromise;
+            _comfyStatsTime = Date.now();
+            _comfyStatsPromise = null;
+            return _comfyStatsCache;
+        }
+
+        async function freeComfyVRAM() {
+            const btn = document.getElementById('inf-vram-free-btn');
+            const origText = btn.innerText;
+            btn.innerText = 'Freeing...';
+            btn.disabled = true;
+            try {
+                await fetch('/api/comfy_proxy', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({endpoint: '/free', payload: {"unload_models": true, "free_memory": true}})
+                });
+                showToast('🧹 VRAM freed — models unloaded from GPU.');
+                // Force an immediate VRAM refresh
+                setTimeout(pollVRAMStatus, 1000);
+            } catch(e) {
+                showToast('⚠️ Failed to free VRAM — is ComfyUI running?');
+            }
+            btn.innerText = origText;
+            btn.disabled = false;
+        }
+
+        async function pollVRAMStatus() {
+            try {
+                // Task 1.1: Use shared cached fetch instead of raw duplicate call
+                const data = await fetchComfySystemStats();
+                if (!data) return;
+                const devices = data.devices || data.system?.devices || [];
+                if (!devices.length) return;
+
+                const gpu = devices[0];
+                const totalBytes = gpu.vram_total || 0;
+                const freeBytes = gpu.vram_free || 0;
+                const usedBytes = totalBytes - freeBytes;
+                const totalGB = (totalBytes / (1024 ** 3)).toFixed(1);
+                const usedGB = (usedBytes / (1024 ** 3)).toFixed(1);
+                const pct = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+
+                // Show the monitor widget
+                const monitor = document.getElementById('inf-vram-monitor');
+                if (monitor) monitor.style.display = '';
+
+                const bar = document.getElementById('inf-vram-bar');
+                const text = document.getElementById('inf-vram-text');
+                if (bar) {
+                    bar.style.width = pct + '%';
+                    // Color gradient: green → yellow → red
+                    if (pct < 60) {
+                        bar.style.background = 'linear-gradient(90deg,#4ade80,#22c55e)';
+                    } else if (pct < 85) {
+                        bar.style.background = 'linear-gradient(90deg,#facc15,#f59e0b)';
+                    } else {
+                        bar.style.background = 'linear-gradient(90deg,#f87171,#ef4444)';
+                    }
+                }
+                if (text) text.textContent = `${usedGB} / ${totalGB} GB (${pct}%)`;
+            } catch(e) {
+                // ComfyUI offline — hide monitor
+                const monitor = document.getElementById('inf-vram-monitor');
+                if (monitor) monitor.style.display = 'none';
+            }
+        }
+
+        function startVRAMPolling() {
+            if (window._vramPollInterval) return;
+            pollVRAMStatus();  // Immediate first poll
+            window._vramPollInterval = setInterval(pollVRAMStatus, 10000);
+        }
+
+        function stopVRAMPolling() {
+            if (window._vramPollInterval) {
+                clearInterval(window._vramPollInterval);
+                window._vramPollInterval = null;
+            }
+            // Audit #5: Close stale WebSocket when leaving Inference tab
+            if (window.comfyWS) {
+                try { window.comfyWS.close(); } catch(_) {}
+                window.comfyWS = null;
+            }
+        }
+
+
         /* ═══════════════════════════════════════════════
+           END OF 00_core.js
+        ═══════════════════════════════════════════════ */
