@@ -1107,12 +1107,48 @@
         }
         #inpaint-canvas.active { display: block; pointer-events: auto; }
 
+        /* Phase 5: SAM Smart Masking */
+        .sam-toolbar {
+            display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 22; background: rgba(15,23,42,0.94); backdrop-filter: blur(14px);
+            border: 1px solid rgba(16,185,129,0.35); border-radius: 12px;
+            padding: 8px 14px; gap: 8px; align-items: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            animation: cmdSlideIn 0.2s ease-out;
+        }
+        .sam-toolbar.active { display: flex; }
+        .sam-toolbar button {
+            background: var(--surface-hover); border: 1px solid var(--border);
+            color: #e2e8f0; padding: 5px 10px; border-radius: 8px;
+            cursor: pointer; font-size: 0.78rem; font-weight: 600;
+            transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+        }
+        .sam-toolbar button:hover { border-color: #10b981; background: rgba(16,185,129,0.15); }
+        .sam-toolbar button:disabled { opacity: 0.4; cursor: default; }
+        .sam-toolbar .separator { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+        .sam-toolbar .sam-status { color: rgba(16,185,129,0.8); font-size: 0.72rem; font-weight: 500; }
+        .sam-point {
+            position: absolute; width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid #fff; z-index: 21; pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+            animation: samPointPop 0.2s ease-out;
+        }
+        .sam-point.positive { background: rgba(16,185,129,0.85); }
+        .sam-point.negative { background: rgba(239,68,68,0.85); }
+        @keyframes samPointPop { from { transform: translate(-50%,-50%) scale(0); } to { transform: translate(-50%,-50%) scale(1); } }
+        #sam-mask-overlay {
+            position: absolute; top: 0; left: 0; z-index: 16;
+            pointer-events: none; opacity: 0.45; display: none;
+            mix-blend-mode: screen;
+        }
+        #sam-mask-overlay.active { display: block; }
         /* ═══ Phase 1 — Outpainting Direction Buttons (visible when image present) ═══ */
         .outpaint-controls {
             display: none; position: absolute; z-index: 18;
             pointer-events: none;
         }
-        .outpaint-controls.has-image { display: block; }
+        .outpaint-controls.has-image.inpaint-active { display: block; }
         .outpaint-controls.active { display: block; }
         .outpaint-btn {
             position: absolute; pointer-events: auto;
@@ -1133,7 +1169,7 @@
         .outpaint-btn.left:hover  { transform: translateY(-50%) scale(1.15); }
         .outpaint-btn.right:hover { transform: translateY(-50%) scale(1.15); }
         /* Subtle pulse animation when outpaint buttons first appear */
-        .outpaint-controls.has-image .outpaint-btn {
+        .outpaint-controls.has-image.inpaint-active .outpaint-btn {
             animation: outpaintPulse 2s ease-in-out 0.5s 2;
         }
         @keyframes outpaintPulse {
@@ -1245,6 +1281,55 @@
         }
         .region-zone .zone-strength input[type="range"] {
             flex: 1; height: 3px; cursor: pointer;
+        }
+        .region-zone .zone-feather {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.7rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-feather input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #8b5cf6;
+        }
+        /* Phase 4: Per-zone LoRA controls */
+        .region-zone .zone-lora {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.68rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-lora select {
+            flex: 2; background: rgba(0,0,0,0.5); color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 3px;
+            font-size: 0.65rem; padding: 1px 3px; cursor: pointer;
+            max-width: 120px; outline: none;
+        }
+        .region-zone .zone-lora input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #f59e0b;
+        }
+        /* Phase 4: Per-zone IP-Adapter reference */
+        .region-zone .zone-ipadapter {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.68rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-ipa-drop {
+            width: 32px; height: 32px; border-radius: 4px;
+            border: 1px dashed rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s; overflow: hidden;
+            background: rgba(0,0,0,0.4); flex-shrink: 0;
+        }
+        .region-zone .zone-ipa-drop:hover {
+            border-color: rgba(236,72,153,0.6);
+            background: rgba(236,72,153,0.08);
+        }
+        .region-zone .zone-ipa-drop.has-image {
+            border-style: solid; border-color: rgba(236,72,153,0.5);
+        }
+        .region-zone .zone-ipa-drop img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .region-zone .zone-ipadapter input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #ec4899;
         }
         .region-zone .zone-resize {
             position: absolute; bottom: -2px; right: -2px;
@@ -1686,7 +1771,7 @@
                 <button id="btn-vault-import-ext" class="btn-base btn-secondary" onclick="triggerExternalImport()" title="Link an external folder (e.g. Stability Matrix Models)">🔗 External Folder</button>
                 <button id="btn-vault-sources" class="btn-base btn-secondary" onclick="showExternalSources()" title="View linked external model sources">📍 Sources</button>
                 <button id="btn-vault-hash-library" class="btn-base btn-secondary" onclick="hashLibrary()" title="Compute SHA-256 hashes for all unhashed models to unlock CivitAI metadata">🔑 Hash Library</button>
-                <button id="btn-vault-import-backup" class="btn-base btn-secondary" onclick="document.getElementById(\'vault-import-file\').click()" title="Import metadata from a vault export JSON">📤 Import Backup</button>
+                <button id="btn-vault-import-backup" class="btn-base btn-secondary" onclick="document.getElementById('vault-import-file').click()" title="Import metadata from a vault export JSON">📤 Import Backup</button>
                 <input type="file" id="vault-import-file" accept=".json" style="display:none" onchange="handleVaultImportBackup(this.files[0])">
             </div>
 
@@ -1728,7 +1813,7 @@
         <div id="view-appstore" style="display: none; padding-top: 10px;">
             <div class="toolbar" style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); background: var(--surface);">
                 <div style="font-weight: 600;">Sandbox App Deployment</div>
-                <button id="btn-recipe-create" class="btn-base btn-primary" onclick="document.getElementById(\'recipe-modal\').style.display=\'flex\';">✨ Create Recipe</button>
+                <button id="btn-recipe-create" class="btn-base btn-primary" onclick="document.getElementById('recipe-modal').style.display='flex';">✨ Create Recipe</button>
             </div>
             <div class="grid" id="recipes-grid"></div>
         </div>
@@ -1916,7 +2001,7 @@
             <div style="width:320px; border-left:1px solid var(--border); padding:24px; overflow-y:auto; background:var(--surface);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
                     <h2 style="margin:0; font-size:1.1rem;">Generation Info</h2>
-                    <button aria-label="Close Lightbox" onclick="document.getElementById(\'gallery-lightbox\').style.display=\'none\'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
+                    <button aria-label="Close Lightbox" onclick="document.getElementById('gallery-lightbox').style.display='none'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
                 </div>
 
                 <!-- Sprint 10: Star Rating -->
@@ -2047,7 +2132,7 @@
         <!-- Help Lightbox Modal -->
         <div id="inf-help-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)this.style.display='none';">
             <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; padding:30px; position:relative;">
-                <button aria-label="Close Help" onclick="document.getElementById(\'inf-help-modal\').style.display=\'none\'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
+                <button aria-label="Close Help" onclick="document.getElementById('inf-help-modal').style.display='none'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
                 <h2 style="margin:0 0 20px; font-size:1.3rem;">Inference Studio — Guide</h2>
                 <div style="display:flex;flex-direction:column;gap:16px;">
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
@@ -2074,13 +2159,81 @@
                         <b style="color:var(--primary)">Image-to-Image</b>
                         <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Upload a reference image to guide generation. Denoise Strength 1.0 = full re-generation; lower values preserve more of the original.</p>
                     </div>
+
+                    <!-- Sprint 12-14: Advanced Features -->
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">🎨 Advanced Canvas Features</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🖌️ Inpainting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🖌️ Inpaint</b> button on the canvas toolbar to enter inpaint mode. Paint a red mask over the area you want to regenerate, then click Generate.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Toolbar controls:</b> Brush/Eraser toggle, Size slider, Undo/Redo, Invert mask, Clear mask.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Denoise:</b> Low (0.3) = subtle fix; High (1.0) = full regeneration of masked area.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Blur:</b> Feathers mask edges (8–20px recommended) to prevent hard seams.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Fill modes:</b> Original (preserves pixels), Noise (VAEEncodeForInpaint), Fill (Telea color fill), Latent Noise (full denoise).</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🎯 Inpaint Model Override</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">In the inpaint toolbar, use the <b>Inpaint Model</b> dropdown to select a dedicated inpainting checkpoint (e.g. <i>realisticVision-inpainting</i>). This enables <b>InpaintModelConditioning</b> — a specialized node that feeds the image + mask into the model's extra conditioning channels for significantly better boundary blending.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Leave as "Use Main Model" to inpaint with your currently selected checkpoint.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🪄 SAM Smart Masking</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🪄 SAM</b> button, then click objects in the image to auto-generate pixel-perfect masks. Use <b>Apply</b> to replace or <b>Add</b> to combine with existing mask. <b>Invert</b> selects everything <i>except</i> the clicked object.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-Impact-Pack extension (one-click install available).</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">↕️ Outpainting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">While in Inpaint mode, use the <b>arrow buttons</b> (↑↓←→) around the image to extend the canvas in any direction. Choose extension size with the <b>128 / 256 / 512</b> buttons. A mask is auto-applied to the new region — click Generate to fill it.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Tip:</b> Extend gradually (128–256px at a time) for more coherent results. Describe the scene continuation in your prompt.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🗺️ Regional Prompting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🗺️ Regions</b> button to create zones with independent prompts. Drag to position, resize from edges. Each zone has its own prompt, negative prompt, and strength slider.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Per-Zone LoRA & IP-Adapter:</b> Each zone can have its own LoRA model and reference image for granular style control.</p>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">⚡ Addons & Extensions</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">😊 FaceDetailer</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Automatically detects and enhances faces after generation. Toggle on in the addon card. Adjust denoise (0.3–0.5 for subtle enhancement), max faces, cycles, and feather settings.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-Impact-Pack.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🔲 LayerDiffuse</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Generates images with transparent backgrounds (alpha channel). Toggle on and select the method matching your model type: <i>SD15 Transparent</i> or <i>SDXL Transparent</i>.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-layerdiffuse extension.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🖼️ IP-Adapter</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Use a reference image to guide style and composition. Available per regional zone — upload a reference image in each zone's IP-Adapter section.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI_IPAdapter_plus extension.</p>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">🔧 Architecture & More</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">⚡ FLUX Pipeline</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Select <b>flux-dev</b> or <b>flux-schnell</b> model type. FLUX requires separate UNET, CLIP-L, and T5-XXL model files. Uses Flux Guidance (default 3.5) instead of CFG scale. VAE defaults to <i>ae.safetensors</i> — do not use SD/SDXL VAEs.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🎬 WAN Video</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Select <b>wan-video-txt</b> (text-to-video) or <b>wan-video-img</b> (image-to-video). Configure Frames, FPS, and Motion Strength. Requires a WAN UNET model and CLIP text encoder.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">📦 Batch Generation</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Set Batch Size (1–8) to generate multiple variations per run. Each image uses a different random seed. All results appear in the gallery strip.</p>
+                    </div>
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
                         <b style="color:var(--primary)">Gallery</b>
                         <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">All generated images appear in the gallery strip. <b>Click</b> a thumbnail to view it. <b>Drag</b> a thumbnail to the output area or the Config column to fully restore all generation settings. Scroll the mouse wheel over the output image to zoom.</p>
                     </div>
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
-                        <b style="color:var(--primary)">Column Resizing</b>
-                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Drag the vertical dividers between columns to resize them to your preference.</p>
+                        <b style="color:var(--primary)">🧭 Canvas Navigation</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;"><b>Scroll wheel</b> to zoom in/out. <b>Click + drag</b> to pan (disabled during inpaint/SAM/region modes). <b>Before/After</b> comparison slider toggles between current and previous generation. Drag column dividers to resize panels.</p>
                     </div>
                 </div>
             </div>
@@ -2442,10 +2595,21 @@
                         <div>
                             <label class="section-title" style="font-size:0.78rem;">Method</label>
                             <select id="inf-ld-method" class="select-fancy">
-                                <option value="SDXL Transparent">SDXL Transparent</option>
-                                <option value="SD15 Transparent">SD 1.5 Transparent</option>
+                                <option value="SDXL, Attention Injection">SDXL — Attention Injection</option>
+                                <option value="SDXL, Conv Injection">SDXL — Conv Injection</option>
+                                <option value="SD1.x, Attention Injection, attn_sharing">SD 1.5 — Attention Injection</option>
                             </select>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Phase 4: IP-Adapter Addon Card -->
+                <div id="inf-ipadapter-section" style="border-top: 1px solid var(--border); padding-top: 15px; padding-bottom: 15px;">
+                    <div id="inf-ipa-install-banner" style="display:none; background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(168,85,247,0.1)); border:1px solid rgba(236,72,153,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.82rem; color:#f472b6;">
+                        ⚠️ IPAdapter Plus not detected — <button id="inf-ipa-install-btn" onclick="installIPAdapter()" style="background:#ec4899; color:#fff; border:none; padding:3px 10px; border-radius:4px; font-weight:700; font-size:0.78rem; cursor:pointer; margin-left:4px;">Install Now</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label class="section-title" style="margin: 0;">🖼️ IP-Adapter <span style="font-size:0.72rem; color:var(--text-muted); font-weight:400;">(per-zone in Regional Mode)</span></label>
                     </div>
                 </div>
             </div>
@@ -2545,6 +2709,9 @@
                     <button id="inf-region-toggle" class="tool-btn" onclick="toggleRegionMode()" title="Regional Prompting">
                         <span class="tool-icon">📐</span><span class="tool-label">Regions</span>
                     </button>
+                    <button id="inf-sam-toggle" class="tool-btn" onclick="toggleSamMode()" title="Smart Select (S) — Click to auto-mask objects">
+                        <span class="tool-icon">🪄</span><span class="tool-label">Smart Select</span>
+                    </button>
                     <button id="inf-compare-toggle" class="tool-btn" onclick="toggleCompareMode()" title="Before / After Comparison (C)" disabled>
                         <span class="tool-icon">🔀</span><span class="tool-label">Compare</span>
                     </button>
@@ -2623,6 +2790,26 @@
                             <option value="latent_noise">Latent Noise</option>
                         </select>
                     </div>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="Optional: Use a dedicated inpainting model instead of the main checkpoint. Enables InpaintModelConditioning for best quality.">
+                        <span class="fine-label">Inpaint Model</span>
+                        <select id="inpaint-model-override" style="max-width:140px;" onchange="window._inpaintModelOverride=this.value;">
+                            <option value="">Use Main Model</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Phase 5: SAM Mask Overlay -->
+                <canvas id="sam-mask-overlay"></canvas>
+                <!-- Phase 5: SAM Smart Masking Toolbar -->
+                <div class="sam-toolbar" id="sam-toolbar">
+                    <span class="sam-status" id="sam-status">🪄 Click to select objects</span>
+                    <div class="separator"></div>
+                    <button id="sam-apply-btn" onclick="applySamMaskToInpaint()" disabled>✅ Apply to Inpaint</button>
+                    <button id="sam-add-btn" onclick="addSamMaskToInpaint()" disabled>➕ Add to Mask</button>
+                    <button id="sam-invert-btn" onclick="invertSamMask()" disabled>🔄 Invert</button>
+                    <div class="separator"></div>
+                    <button onclick="clearSamPoints()">🗑️ Clear</button>
+                    <button onclick="toggleSamMode()">✕ Done</button>
                 </div>
                 <!-- Sprint 12: Outpainting Direction Buttons -->
                 <div class="outpaint-controls" id="outpaint-controls">
@@ -2671,6 +2858,12 @@
                         <span class="fine-label">Base</span>
                         <input type="range" id="region-base-ratio" min="0" max="100" value="0" oninput="window._regionBaseRatio=+this.value/100; document.getElementById('region-base-label').textContent=(+this.value/100).toFixed(1);">
                         <span class="fine-value" id="region-base-label">0.0</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="Global zone boundary feather in pixels. Per-zone sliders override this.">
+                        <span class="fine-label">Feather</span>
+                        <input type="range" id="region-global-feather" min="0" max="40" value="8" oninput="window._regionGlobalFeather=+this.value; document.getElementById('region-feather-label').textContent=this.value+'px';">
+                        <span class="fine-value" id="region-feather-label">8px</span>
                     </div>
                     <div class="separator"></div>
                     <button onclick="clearAllRegions()" title="Clear All Zones">🗑️ Clear</button>

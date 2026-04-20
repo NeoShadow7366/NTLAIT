@@ -1107,12 +1107,48 @@
         }
         #inpaint-canvas.active { display: block; pointer-events: auto; }
 
+        /* Phase 5: SAM Smart Masking */
+        .sam-toolbar {
+            display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            z-index: 22; background: rgba(15,23,42,0.94); backdrop-filter: blur(14px);
+            border: 1px solid rgba(16,185,129,0.35); border-radius: 12px;
+            padding: 8px 14px; gap: 8px; align-items: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            animation: cmdSlideIn 0.2s ease-out;
+        }
+        .sam-toolbar.active { display: flex; }
+        .sam-toolbar button {
+            background: var(--surface-hover); border: 1px solid var(--border);
+            color: #e2e8f0; padding: 5px 10px; border-radius: 8px;
+            cursor: pointer; font-size: 0.78rem; font-weight: 600;
+            transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+        }
+        .sam-toolbar button:hover { border-color: #10b981; background: rgba(16,185,129,0.15); }
+        .sam-toolbar button:disabled { opacity: 0.4; cursor: default; }
+        .sam-toolbar .separator { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+        .sam-toolbar .sam-status { color: rgba(16,185,129,0.8); font-size: 0.72rem; font-weight: 500; }
+        .sam-point {
+            position: absolute; width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid #fff; z-index: 21; pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+            animation: samPointPop 0.2s ease-out;
+        }
+        .sam-point.positive { background: rgba(16,185,129,0.85); }
+        .sam-point.negative { background: rgba(239,68,68,0.85); }
+        @keyframes samPointPop { from { transform: translate(-50%,-50%) scale(0); } to { transform: translate(-50%,-50%) scale(1); } }
+        #sam-mask-overlay {
+            position: absolute; top: 0; left: 0; z-index: 16;
+            pointer-events: none; opacity: 0.45; display: none;
+            mix-blend-mode: screen;
+        }
+        #sam-mask-overlay.active { display: block; }
         /* ═══ Phase 1 — Outpainting Direction Buttons (visible when image present) ═══ */
         .outpaint-controls {
             display: none; position: absolute; z-index: 18;
             pointer-events: none;
         }
-        .outpaint-controls.has-image { display: block; }
+        .outpaint-controls.has-image.inpaint-active { display: block; }
         .outpaint-controls.active { display: block; }
         .outpaint-btn {
             position: absolute; pointer-events: auto;
@@ -1133,7 +1169,7 @@
         .outpaint-btn.left:hover  { transform: translateY(-50%) scale(1.15); }
         .outpaint-btn.right:hover { transform: translateY(-50%) scale(1.15); }
         /* Subtle pulse animation when outpaint buttons first appear */
-        .outpaint-controls.has-image .outpaint-btn {
+        .outpaint-controls.has-image.inpaint-active .outpaint-btn {
             animation: outpaintPulse 2s ease-in-out 0.5s 2;
         }
         @keyframes outpaintPulse {
@@ -1245,6 +1281,55 @@
         }
         .region-zone .zone-strength input[type="range"] {
             flex: 1; height: 3px; cursor: pointer;
+        }
+        .region-zone .zone-feather {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.7rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-feather input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #8b5cf6;
+        }
+        /* Phase 4: Per-zone LoRA controls */
+        .region-zone .zone-lora {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.68rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-lora select {
+            flex: 2; background: rgba(0,0,0,0.5); color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 3px;
+            font-size: 0.65rem; padding: 1px 3px; cursor: pointer;
+            max-width: 120px; outline: none;
+        }
+        .region-zone .zone-lora input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #f59e0b;
+        }
+        /* Phase 4: Per-zone IP-Adapter reference */
+        .region-zone .zone-ipadapter {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.68rem; color: rgba(255,255,255,0.6);
+            padding: 0 2px;
+        }
+        .region-zone .zone-ipa-drop {
+            width: 32px; height: 32px; border-radius: 4px;
+            border: 1px dashed rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s; overflow: hidden;
+            background: rgba(0,0,0,0.4); flex-shrink: 0;
+        }
+        .region-zone .zone-ipa-drop:hover {
+            border-color: rgba(236,72,153,0.6);
+            background: rgba(236,72,153,0.08);
+        }
+        .region-zone .zone-ipa-drop.has-image {
+            border-style: solid; border-color: rgba(236,72,153,0.5);
+        }
+        .region-zone .zone-ipa-drop img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .region-zone .zone-ipadapter input[type="range"] {
+            flex: 1; height: 3px; cursor: pointer; accent-color: #ec4899;
         }
         .region-zone .zone-resize {
             position: absolute; bottom: -2px; right: -2px;
@@ -1686,7 +1771,7 @@
                 <button id="btn-vault-import-ext" class="btn-base btn-secondary" onclick="triggerExternalImport()" title="Link an external folder (e.g. Stability Matrix Models)">🔗 External Folder</button>
                 <button id="btn-vault-sources" class="btn-base btn-secondary" onclick="showExternalSources()" title="View linked external model sources">📍 Sources</button>
                 <button id="btn-vault-hash-library" class="btn-base btn-secondary" onclick="hashLibrary()" title="Compute SHA-256 hashes for all unhashed models to unlock CivitAI metadata">🔑 Hash Library</button>
-                <button id="btn-vault-import-backup" class="btn-base btn-secondary" onclick="document.getElementById(\'vault-import-file\').click()" title="Import metadata from a vault export JSON">📤 Import Backup</button>
+                <button id="btn-vault-import-backup" class="btn-base btn-secondary" onclick="document.getElementById('vault-import-file').click()" title="Import metadata from a vault export JSON">📤 Import Backup</button>
                 <input type="file" id="vault-import-file" accept=".json" style="display:none" onchange="handleVaultImportBackup(this.files[0])">
             </div>
 
@@ -1728,7 +1813,7 @@
         <div id="view-appstore" style="display: none; padding-top: 10px;">
             <div class="toolbar" style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); background: var(--surface);">
                 <div style="font-weight: 600;">Sandbox App Deployment</div>
-                <button id="btn-recipe-create" class="btn-base btn-primary" onclick="document.getElementById(\'recipe-modal\').style.display=\'flex\';">✨ Create Recipe</button>
+                <button id="btn-recipe-create" class="btn-base btn-primary" onclick="document.getElementById('recipe-modal').style.display='flex';">✨ Create Recipe</button>
             </div>
             <div class="grid" id="recipes-grid"></div>
         </div>
@@ -1916,7 +2001,7 @@
             <div style="width:320px; border-left:1px solid var(--border); padding:24px; overflow-y:auto; background:var(--surface);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
                     <h2 style="margin:0; font-size:1.1rem;">Generation Info</h2>
-                    <button aria-label="Close Lightbox" onclick="document.getElementById(\'gallery-lightbox\').style.display=\'none\'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
+                    <button aria-label="Close Lightbox" onclick="document.getElementById('gallery-lightbox').style.display='none'" style="background:none; border:none; border-radius:50%; color:var(--text-muted); cursor:pointer; font-size:1.5rem; line-height:1;">&times;</button>
                 </div>
 
                 <!-- Sprint 10: Star Rating -->
@@ -2047,7 +2132,7 @@
         <!-- Help Lightbox Modal -->
         <div id="inf-help-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target===this)this.style.display='none';">
             <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; max-width:700px; width:90%; max-height:85vh; overflow-y:auto; padding:30px; position:relative;">
-                <button aria-label="Close Help" onclick="document.getElementById(\'inf-help-modal\').style.display=\'none\'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
+                <button aria-label="Close Help" onclick="document.getElementById('inf-help-modal').style.display='none'" style="position:absolute;top:15px;right:15px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">✕</button>
                 <h2 style="margin:0 0 20px; font-size:1.3rem;">Inference Studio — Guide</h2>
                 <div style="display:flex;flex-direction:column;gap:16px;">
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
@@ -2074,13 +2159,81 @@
                         <b style="color:var(--primary)">Image-to-Image</b>
                         <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Upload a reference image to guide generation. Denoise Strength 1.0 = full re-generation; lower values preserve more of the original.</p>
                     </div>
+
+                    <!-- Sprint 12-14: Advanced Features -->
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">🎨 Advanced Canvas Features</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🖌️ Inpainting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🖌️ Inpaint</b> button on the canvas toolbar to enter inpaint mode. Paint a red mask over the area you want to regenerate, then click Generate.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Toolbar controls:</b> Brush/Eraser toggle, Size slider, Undo/Redo, Invert mask, Clear mask.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Denoise:</b> Low (0.3) = subtle fix; High (1.0) = full regeneration of masked area.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Blur:</b> Feathers mask edges (8–20px recommended) to prevent hard seams.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Fill modes:</b> Original (preserves pixels), Noise (VAEEncodeForInpaint), Fill (Telea color fill), Latent Noise (full denoise).</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🎯 Inpaint Model Override</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">In the inpaint toolbar, use the <b>Inpaint Model</b> dropdown to select a dedicated inpainting checkpoint (e.g. <i>realisticVision-inpainting</i>). This enables <b>InpaintModelConditioning</b> — a specialized node that feeds the image + mask into the model's extra conditioning channels for significantly better boundary blending.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Leave as "Use Main Model" to inpaint with your currently selected checkpoint.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🪄 SAM Smart Masking</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🪄 SAM</b> button, then click objects in the image to auto-generate pixel-perfect masks. Use <b>Apply</b> to replace or <b>Add</b> to combine with existing mask. <b>Invert</b> selects everything <i>except</i> the clicked object.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-Impact-Pack extension (one-click install available).</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">↕️ Outpainting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">While in Inpaint mode, use the <b>arrow buttons</b> (↑↓←→) around the image to extend the canvas in any direction. Choose extension size with the <b>128 / 256 / 512</b> buttons. A mask is auto-applied to the new region — click Generate to fill it.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Tip:</b> Extend gradually (128–256px at a time) for more coherent results. Describe the scene continuation in your prompt.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🗺️ Regional Prompting</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Click the <b>🗺️ Regions</b> button to create zones with independent prompts. Drag to position, resize from edges. Each zone has its own prompt, negative prompt, and strength slider.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;"><b>Per-Zone LoRA & IP-Adapter:</b> Each zone can have its own LoRA model and reference image for granular style control.</p>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">⚡ Addons & Extensions</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">😊 FaceDetailer</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Automatically detects and enhances faces after generation. Toggle on in the addon card. Adjust denoise (0.3–0.5 for subtle enhancement), max faces, cycles, and feather settings.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-Impact-Pack.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🔲 LayerDiffuse</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Generates images with transparent backgrounds (alpha channel). Toggle on and select the method matching your model type: <i>SD15 Transparent</i> or <i>SDXL Transparent</i>.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI-layerdiffuse extension.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🖼️ IP-Adapter</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Use a reference image to guide style and composition. Available per regional zone — upload a reference image in each zone's IP-Adapter section.</p>
+                        <p style="margin:6px 0 0;color:var(--text-muted);font-size:0.85rem;">Requires ComfyUI_IPAdapter_plus extension.</p>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+                        <h3 style="margin:0 0 12px;font-size:1.1rem;color:var(--primary);">🔧 Architecture & More</h3>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">⚡ FLUX Pipeline</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Select <b>flux-dev</b> or <b>flux-schnell</b> model type. FLUX requires separate UNET, CLIP-L, and T5-XXL model files. Uses Flux Guidance (default 3.5) instead of CFG scale. VAE defaults to <i>ae.safetensors</i> — do not use SD/SDXL VAEs.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">🎬 WAN Video</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Select <b>wan-video-txt</b> (text-to-video) or <b>wan-video-img</b> (image-to-video). Configure Frames, FPS, and Motion Strength. Requires a WAN UNET model and CLIP text encoder.</p>
+                    </div>
+                    <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
+                        <b style="color:var(--primary)">📦 Batch Generation</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Set Batch Size (1–8) to generate multiple variations per run. Each image uses a different random seed. All results appear in the gallery strip.</p>
+                    </div>
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
                         <b style="color:var(--primary)">Gallery</b>
                         <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">All generated images appear in the gallery strip. <b>Click</b> a thumbnail to view it. <b>Drag</b> a thumbnail to the output area or the Config column to fully restore all generation settings. Scroll the mouse wheel over the output image to zoom.</p>
                     </div>
                     <div style="background:var(--bg-color);border-radius:10px;padding:16px;border:1px solid var(--border)">
-                        <b style="color:var(--primary)">Column Resizing</b>
-                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;">Drag the vertical dividers between columns to resize them to your preference.</p>
+                        <b style="color:var(--primary)">🧭 Canvas Navigation</b>
+                        <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.9rem;"><b>Scroll wheel</b> to zoom in/out. <b>Click + drag</b> to pan (disabled during inpaint/SAM/region modes). <b>Before/After</b> comparison slider toggles between current and previous generation. Drag column dividers to resize panels.</p>
                     </div>
                 </div>
             </div>
@@ -2442,10 +2595,21 @@
                         <div>
                             <label class="section-title" style="font-size:0.78rem;">Method</label>
                             <select id="inf-ld-method" class="select-fancy">
-                                <option value="SDXL Transparent">SDXL Transparent</option>
-                                <option value="SD15 Transparent">SD 1.5 Transparent</option>
+                                <option value="SDXL, Attention Injection">SDXL — Attention Injection</option>
+                                <option value="SDXL, Conv Injection">SDXL — Conv Injection</option>
+                                <option value="SD1.x, Attention Injection, attn_sharing">SD 1.5 — Attention Injection</option>
                             </select>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Phase 4: IP-Adapter Addon Card -->
+                <div id="inf-ipadapter-section" style="border-top: 1px solid var(--border); padding-top: 15px; padding-bottom: 15px;">
+                    <div id="inf-ipa-install-banner" style="display:none; background:linear-gradient(135deg,rgba(236,72,153,0.15),rgba(168,85,247,0.1)); border:1px solid rgba(236,72,153,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.82rem; color:#f472b6;">
+                        ⚠️ IPAdapter Plus not detected — <button id="inf-ipa-install-btn" onclick="installIPAdapter()" style="background:#ec4899; color:#fff; border:none; padding:3px 10px; border-radius:4px; font-weight:700; font-size:0.78rem; cursor:pointer; margin-left:4px;">Install Now</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label class="section-title" style="margin: 0;">🖼️ IP-Adapter <span style="font-size:0.72rem; color:var(--text-muted); font-weight:400;">(per-zone in Regional Mode)</span></label>
                     </div>
                 </div>
             </div>
@@ -2545,6 +2709,9 @@
                     <button id="inf-region-toggle" class="tool-btn" onclick="toggleRegionMode()" title="Regional Prompting">
                         <span class="tool-icon">📐</span><span class="tool-label">Regions</span>
                     </button>
+                    <button id="inf-sam-toggle" class="tool-btn" onclick="toggleSamMode()" title="Smart Select (S) — Click to auto-mask objects">
+                        <span class="tool-icon">🪄</span><span class="tool-label">Smart Select</span>
+                    </button>
                     <button id="inf-compare-toggle" class="tool-btn" onclick="toggleCompareMode()" title="Before / After Comparison (C)" disabled>
                         <span class="tool-icon">🔀</span><span class="tool-label">Compare</span>
                     </button>
@@ -2623,6 +2790,26 @@
                             <option value="latent_noise">Latent Noise</option>
                         </select>
                     </div>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="Optional: Use a dedicated inpainting model instead of the main checkpoint. Enables InpaintModelConditioning for best quality.">
+                        <span class="fine-label">Inpaint Model</span>
+                        <select id="inpaint-model-override" style="max-width:140px;" onchange="window._inpaintModelOverride=this.value;">
+                            <option value="">Use Main Model</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Phase 5: SAM Mask Overlay -->
+                <canvas id="sam-mask-overlay"></canvas>
+                <!-- Phase 5: SAM Smart Masking Toolbar -->
+                <div class="sam-toolbar" id="sam-toolbar">
+                    <span class="sam-status" id="sam-status">🪄 Click to select objects</span>
+                    <div class="separator"></div>
+                    <button id="sam-apply-btn" onclick="applySamMaskToInpaint()" disabled>✅ Apply to Inpaint</button>
+                    <button id="sam-add-btn" onclick="addSamMaskToInpaint()" disabled>➕ Add to Mask</button>
+                    <button id="sam-invert-btn" onclick="invertSamMask()" disabled>🔄 Invert</button>
+                    <div class="separator"></div>
+                    <button onclick="clearSamPoints()">🗑️ Clear</button>
+                    <button onclick="toggleSamMode()">✕ Done</button>
                 </div>
                 <!-- Sprint 12: Outpainting Direction Buttons -->
                 <div class="outpaint-controls" id="outpaint-controls">
@@ -2671,6 +2858,12 @@
                         <span class="fine-label">Base</span>
                         <input type="range" id="region-base-ratio" min="0" max="100" value="0" oninput="window._regionBaseRatio=+this.value/100; document.getElementById('region-base-label').textContent=(+this.value/100).toFixed(1);">
                         <span class="fine-value" id="region-base-label">0.0</span>
+                    </div>
+                    <div class="separator"></div>
+                    <div class="fine-ctrl" title="Global zone boundary feather in pixels. Per-zone sliders override this.">
+                        <span class="fine-label">Feather</span>
+                        <input type="range" id="region-global-feather" min="0" max="40" value="8" oninput="window._regionGlobalFeather=+this.value; document.getElementById('region-feather-label').textContent=this.value+'px';">
+                        <span class="fine-value" id="region-feather-label">8px</span>
                     </div>
                     <div class="separator"></div>
                     <button onclick="clearAllRegions()" title="Clear All Zones">🗑️ Clear</button>
@@ -2988,6 +3181,8 @@
 
                 container.addEventListener('mousedown', (e) => {
                     if(img.style.display === 'none') return;
+                    // Don't pan while drawing inpaint masks, SAM clicking, or region editing
+                    if (window._inpaintActive || window._samActive || window._regionMode) return;
                     _isPanning = true;
                     _startX = e.clientX - (_panX * _zoom);
                     _startY = e.clientY - (_panY * _zoom);
@@ -5929,6 +6124,10 @@
             if (!window._inpaintActive && window._regionMode) {
                 toggleRegionMode();
             }
+            /* Phase 5: Deactivate SAM mode */
+            if (!window._inpaintActive && window._samActive) {
+                toggleSamMode();
+            }
             window._inpaintActive = !window._inpaintActive;
             const canvas = document.getElementById('inpaint-canvas');
             const toolbar = document.getElementById('inpaint-toolbar');
@@ -5941,6 +6140,7 @@
                 canvas.classList.add('active');
                 toolbar.classList.add('active');
                 outpaint.classList.add('active');
+                outpaint.classList.add('inpaint-active');
                 toggleBtn.classList.add('active');
                 /* Phase 1: Show mode banner */
                 showModeBanner('inpaint', '🖌️ INPAINT MODE — Paint mask on the image to define the inpainting area');
@@ -5953,6 +6153,7 @@
                 canvas.classList.remove('active');
                 toolbar.classList.remove('active');
                 outpaint.classList.remove('active');
+                outpaint.classList.remove('inpaint-active');
                 toggleBtn.classList.remove('active');
                 hideModeBanner();
                 hideBrushCursor();
@@ -6962,12 +7163,17 @@
         window._regionMode = false;
         window._regionZones = [];
         window._regionBaseRatio = 0.0;
+        window._regionGlobalFeather = 8; /* Phase 3: Default boundary feather in pixels */
         const ZONE_COLORS = ['#ef4444','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316'];
 
         function toggleRegionMode() {
             /* Phase 1: Mutual exclusion — deactivate inpaint mode first */
             if (!window._regionMode && window._inpaintActive) {
                 toggleInpaintMode();
+            }
+            /* Phase 5: Deactivate SAM mode */
+            if (!window._regionMode && window._samActive) {
+                toggleSamMode();
             }
             window._regionMode = !window._regionMode;
             const editor = document.getElementById('region-editor');
@@ -7021,6 +7227,7 @@
             zone.style.height = zoneH + '%';
             zone.dataset.zoneIdx = idx;
             zone.dataset.strength = '1.0';
+            zone.dataset.feather = ''; /* Phase 3: Empty = use global default */
 
             zone.innerHTML = `
                 <div class="zone-header" style="background:${color}55;">
@@ -7034,6 +7241,25 @@
                         <span>Str</span>
                         <input type="range" min="0" max="150" value="100" oninput="this.nextElementSibling.textContent=((+this.value)/100).toFixed(1); this.closest('.region-zone').dataset.strength=((+this.value)/100).toFixed(1);">
                         <span>1.0</span>
+                    </div>
+                    <div class="zone-feather">
+                        <span>Feather</span>
+                        <input type="range" min="0" max="40" value="" oninput="this.nextElementSibling.textContent=this.value+'px'; this.closest('.region-zone').dataset.feather=this.value;">
+                        <span>—</span>
+                    </div>
+                    <div class="zone-lora">
+                        <span>LoRA</span>
+                        <select class="zone-lora-select" onchange="this.closest('.region-zone').dataset.loraName=this.value;"><option value="">None</option></select>
+                        <input type="range" min="-200" max="200" value="100" class="zone-lora-weight" oninput="this.nextElementSibling.textContent=((+this.value)/100).toFixed(1); this.closest('.region-zone').dataset.loraWeight=((+this.value)/100).toFixed(1);">
+                        <span>1.0</span>
+                    </div>
+                    <div class="zone-ipadapter">
+                        <span>IP-Ref</span>
+                        <div class="zone-ipa-drop" title="Click or drop a reference image for IP-Adapter">
+                            <span class="zone-ipa-placeholder">📎</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="80" class="zone-ipa-weight" oninput="this.nextElementSibling.textContent=((+this.value)/100).toFixed(1); this.closest('.region-zone').dataset.ipaWeight=((+this.value)/100).toFixed(1);">
+                        <span>0.8</span>
                     </div>
                 </div>
                 <div class="zone-resize">◢</div>
@@ -7093,6 +7319,46 @@
             editor.appendChild(zone);
             window._regionZones.push({ element: zone, color: color });
             updateZoneCount();
+
+            /* Phase 4: Populate LoRA dropdown from window.availableLoras */
+            const loraSelect = zone.querySelector('.zone-lora-select');
+            if (loraSelect && window.availableLoras && window.availableLoras.length > 0) {
+                window.availableLoras.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.filename;
+                    opt.textContent = l.metadata?.model?.name
+                        ? (l.metadata.model.name.substring(0, 20) + (l.metadata.model.name.length > 20 ? '…' : ''))
+                        : l.filename.substring(0, 24);
+                    loraSelect.appendChild(opt);
+                });
+            }
+            zone.dataset.loraName = '';
+            zone.dataset.loraWeight = '1.0';
+            zone.dataset.ipaWeight = '0.8';
+            zone.dataset.ipaImageB64 = '';
+
+            /* Phase 4: IP-Adapter reference image drop handler */
+            const ipaDrop = zone.querySelector('.zone-ipa-drop');
+            if (ipaDrop) {
+                // Click to select file
+                ipaDrop.addEventListener('click', () => {
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'image/*';
+                    fileInput.onchange = (e) => handleZoneIpaFile(zone, e.target.files[0]);
+                    fileInput.click();
+                });
+                // Drag & drop
+                ipaDrop.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); ipaDrop.style.borderColor = '#ec4899'; });
+                ipaDrop.addEventListener('dragleave', (e) => { e.stopPropagation(); ipaDrop.style.borderColor = ''; });
+                ipaDrop.addEventListener('drop', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    ipaDrop.style.borderColor = '';
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        handleZoneIpaFile(zone, e.dataTransfer.files[0]);
+                    }
+                });
+            }
         }
 
         function removeRegionZone(idx) {
@@ -7158,14 +7424,66 @@
             if (el) el.textContent = `${window._regionZones.length} zone${window._regionZones.length !== 1 ? 's' : ''}`;
         }
 
+        /**
+         * Phase 3: Generate a feathered grayscale mask for a zone at half-resolution.
+         * White = full conditioning, black = no conditioning, gray = feathered transition.
+         * @param {number} zx - Zone x (0-1 normalized)
+         * @param {number} zy - Zone y (0-1 normalized)
+         * @param {number} zw - Zone width (0-1 normalized)
+         * @param {number} zh - Zone height (0-1 normalized)
+         * @param {number} featherPx - Feather radius in pixels (at target res)
+         * @param {number} targetW - Target image width
+         * @param {number} targetH - Target image height
+         * @returns {string} Base64 PNG of the mask
+         */
+        function generateZoneMask(zx, zy, zw, zh, featherPx, targetW, targetH) {
+            // Half-resolution for smaller uploads — ComfyUI scales masks internally
+            const maskW = Math.round(targetW / 2);
+            const maskH = Math.round(targetH / 2);
+            const scaledFeather = Math.max(1, Math.round(featherPx / 2));
+
+            const c = document.createElement('canvas');
+            c.width = maskW;
+            c.height = maskH;
+            const ctx = c.getContext('2d');
+
+            // Fill black (no conditioning)
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, maskW, maskH);
+
+            // Draw white rectangle for the zone area
+            const rx = Math.round(zx * maskW);
+            const ry = Math.round(zy * maskH);
+            const rw = Math.max(4, Math.round(zw * maskW));
+            const rh = Math.max(4, Math.round(zh * maskH));
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(rx, ry, rw, rh);
+
+            // Apply 3-pass box blur for Gaussian approximation on the red channel
+            const imageData = ctx.getImageData(0, 0, maskW, maskH);
+            applyBoxBlur(imageData, maskW, maskH, scaledFeather);
+            applyBoxBlur(imageData, maskW, maskH, scaledFeather);
+            applyBoxBlur(imageData, maskW, maskH, scaledFeather);
+            ctx.putImageData(imageData, 0, 0);
+
+            return c.toDataURL('image/png').split(',')[1];
+        }
+
         function getRegionData() {
             // Returns normalized region data for backend translators
-            // Each zone: { prompt, negative, x, y, w, h, strength } (0-1 normalized to canvas dimensions)
+            // Each zone: { prompt, negative, x, y, w, h, strength, feather, mask_b64?, lora?, ipa_image_b64?, ipa_weight? }
             if (!window._regionMode || window._regionZones.length === 0) return null;
             const editor = document.getElementById('region-editor');
             const editorW = editor.offsetWidth;
             const editorH = editor.offsetHeight;
             if (!editorW || !editorH) return null;
+
+            // Read target image dimensions for mask generation
+            const targetW = parseInt(document.getElementById('inf-width')?.value || '1024');
+            const targetH = parseInt(document.getElementById('inf-height')?.value || '1024');
+
+            // Phase 4: VRAM warning for >2 zones with IP-Adapter
+            let ipaCount = 0;
 
             const regions = [];
             for (const z of window._regionZones) {
@@ -7173,16 +7491,56 @@
                 const prompt = el.querySelector('.zone-pos')?.value || el.querySelector('textarea')?.value || '';
                 if (!prompt.trim()) continue;
                 const negative = el.querySelector('.zone-neg')?.value || '';
-                regions.push({
+                const normX = el.offsetLeft / editorW;
+                const normY = el.offsetTop / editorH;
+                const normW = el.offsetWidth / editorW;
+                const normH = el.offsetHeight / editorH;
+                // Phase 3: Per-zone feather (falls back to global default)
+                const zoneFeather = el.dataset.feather !== '' ? parseInt(el.dataset.feather) : window._regionGlobalFeather;
+                const featherVal = isNaN(zoneFeather) ? 0 : zoneFeather;
+
+                const region = {
                     prompt: prompt.trim(),
                     negative: negative.trim(),
-                    x: el.offsetLeft / editorW,
-                    y: el.offsetTop / editorH,
-                    w: el.offsetWidth / editorW,
-                    h: el.offsetHeight / editorH,
-                    strength: parseFloat(el.dataset.strength || '1.0')
-                });
+                    x: normX,
+                    y: normY,
+                    w: normW,
+                    h: normH,
+                    strength: parseFloat(el.dataset.strength || '1.0'),
+                    feather: featherVal
+                };
+
+                // Phase 4: Per-zone LoRA
+                const loraName = el.dataset.loraName || '';
+                if (loraName) {
+                    region.lora = {
+                        name: loraName,
+                        weight: parseFloat(el.dataset.loraWeight || '1.0')
+                    };
+                }
+
+                // Phase 4: Per-zone IP-Adapter reference image
+                const ipaB64 = el.dataset.ipaImageB64 || '';
+                if (ipaB64) {
+                    region.ipa_image_b64 = ipaB64;
+                    region.ipa_weight = parseFloat(el.dataset.ipaWeight || '0.8');
+                    ipaCount++;
+                }
+
+                // Phase 3: Generate feathered mask when feather > 0
+                // Phase 4: Also generate hard-edged mask when IPA is active (required for regional isolation)
+                if (featherVal > 0 || ipaB64) {
+                    region.mask_b64 = generateZoneMask(normX, normY, normW, normH, Math.max(featherVal, 0), targetW, targetH);
+                }
+
+                regions.push(region);
             }
+
+            // Phase 4: VRAM warning
+            if (ipaCount > 2) {
+                showToast(`⚠️ ${ipaCount} zones use IP-Adapter — high VRAM usage. Consider reducing.`);
+            }
+
             return regions.length > 0 ? regions : null;
         }
 
@@ -9077,17 +9435,115 @@
                 if (!res.ok) return;
                 const nodeInfo = await res.json();
                 
-                // FaceDetailer: requires Impact Pack (FaceDetailer node)
-                const hasFaceDetailer = !!nodeInfo['FaceDetailer'];
+                // FaceDetailer: requires Impact Pack (FaceDetailer node) + Subpack (UltralyticsDetectorProvider)
+                const hasFaceDetailer = !!nodeInfo['FaceDetailer'] && !!nodeInfo['UltralyticsDetectorProvider'];
                 const fdBanner = document.getElementById('inf-fd-install-banner');
+                const fdToggle = document.getElementById('inf-fd-enable');
                 if (fdBanner) fdBanner.style.display = hasFaceDetailer ? 'none' : 'block';
+                if (fdToggle) {
+                    fdToggle.disabled = !hasFaceDetailer;
+                    if (!hasFaceDetailer) fdToggle.checked = false;
+                }
                 
                 // LayerDiffuse: requires LayeredDiffusionApply node
                 const hasLayerDiffuse = !!nodeInfo['LayeredDiffusionApply'];
                 const ldBanner = document.getElementById('inf-ld-install-banner');
+                const ldToggle = document.getElementById('inf-ld-enable');
                 if (ldBanner) ldBanner.style.display = hasLayerDiffuse ? 'none' : 'block';
+                if (ldToggle) {
+                    ldToggle.disabled = !hasLayerDiffuse;
+                    if (!hasLayerDiffuse) ldToggle.checked = false;
+                }
+
+                // Phase 4: IP-Adapter: requires IPAdapterUnifiedLoader node
+                const hasIPAdapter = !!nodeInfo['IPAdapterUnifiedLoader'];
+                const ipaBanner = document.getElementById('inf-ipa-install-banner');
+                if (ipaBanner) ipaBanner.style.display = hasIPAdapter ? 'none' : 'block';
+
+                // Phase 5: SAM: requires SAMLoader node (Impact Pack)
+                const hasSAM = !!nodeInfo['SAMLoader'];
+                const samToggle = document.getElementById('inf-sam-toggle');
+                if (samToggle) {
+                    samToggle.title = hasSAM
+                        ? 'Smart Select (S) — Click to auto-mask objects'
+                        : 'Smart Select — Requires Impact Pack (install via Addons)';
+                }
             } catch(e) {
                 // ComfyUI offline — don't show banners
+            }
+        }
+
+        // Shared helper: poll extension install job until fully complete (clone + pip + install.py)
+        async function _waitForExtensionJob(jobId, btn, label) {
+            return new Promise((resolve, reject) => {
+                const poll = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/api/extensions/status?job_id=${jobId}`);
+                        const job = await res.json();
+                        const status = job.status || '';
+                        const pct = job.percent || 0;
+                        const text = job.progress_text || '';
+
+                        if (btn) btn.textContent = `${label} ${pct}%`;
+
+                        if (status === 'completed') {
+                            clearInterval(poll);
+                            resolve(true);
+                        } else if (status === 'failed' || status === 'cancelled') {
+                            clearInterval(poll);
+                            reject(new Error(text || 'Install failed'));
+                        }
+                        // 'cloning', 'installing_deps', 'running_install_script' → keep polling
+                    } catch(_) {}
+                }, 2000);
+                // Safety timeout — 10 minutes for large extensions
+                setTimeout(() => { clearInterval(poll); reject(new Error('Install timed out')); }, 600000);
+            });
+        }
+
+        // Shared helper: restart ComfyUI engine after addon install
+        async function _restartEngineAfterInstall(btn, addonName) {
+            if (btn) {
+                btn.textContent = '♻️ Restarting Engine...';
+                btn.style.background = '#6366f1';
+                btn.style.color = '#fff';
+                btn.disabled = true;
+            }
+            showToast(`♻️ Restarting ComfyUI to activate ${addonName}...`);
+            try {
+                // Stop the running engine
+                await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({package_id: 'comfyui'})
+                });
+                // Brief pause for process cleanup
+                await new Promise(r => setTimeout(r, 2000));
+                // Reset auto-launch tracking so launchActiveEngine will fire
+                if (window._engineAutoLaunched) delete window._engineAutoLaunched['comfyui'];
+                window.engineLaunching = false;
+                // Relaunch — this polls until ComfyUI responds
+                launchActiveEngine();
+                // Wait for engine to come back, then re-check addons
+                const checkReady = setInterval(async () => {
+                    try {
+                        const probe = await fetch('/api/comfy_proxy', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({endpoint: '/system_stats'})
+                        });
+                        if (probe.ok) {
+                            clearInterval(checkReady);
+                            showToast(`✅ ${addonName} is now active!`);
+                            checkAddonExtensions();
+                        }
+                    } catch(_) {}
+                }, 2000);
+                // Safety timeout — stop polling after 120s
+                setTimeout(() => clearInterval(checkReady), 120000);
+            } catch(e) {
+                showToast('⚠️ Restart failed: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = 'Restart Engine'; }
             }
         }
 
@@ -9099,14 +9555,21 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        name: 'ComfyUI-Impact-Pack',
-                        url: 'https://github.com/ltdrdata/ComfyUI-Impact-Pack.git'
+                        package_id: 'comfyui',
+                        repo_url: 'https://github.com/ltdrdata/ComfyUI-Impact-Pack.git'
                     })
                 });
                 const data = await res.json();
-                if (data.status === 'success') {
-                    showToast('✅ Impact Pack installed! Restart ComfyUI to activate.');
-                    if (btn) btn.textContent = 'Restart Required';
+                if (data.status === 'success' && data.job_id) {
+                    showToast('📦 Impact Pack cloning... dependencies will install automatically.');
+                    try {
+                        await _waitForExtensionJob(data.job_id, btn, 'Installing');
+                        showToast('✅ Impact Pack fully installed! Restarting engine...');
+                        _restartEngineAfterInstall(btn, 'Impact Pack');
+                    } catch(jobErr) {
+                        showToast('⚠️ Install issue: ' + jobErr.message);
+                        if (btn) { btn.disabled = false; btn.textContent = 'Retry Install'; }
+                    }
                 } else {
                     showToast('⚠️ Install failed: ' + (data.message || 'Unknown error'));
                     if (btn) { btn.disabled = false; btn.textContent = 'Install Now'; }
@@ -9125,14 +9588,21 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        name: 'ComfyUI-layerdiffuse',
-                        url: 'https://github.com/huchenlei/ComfyUI-layerdiffuse.git'
+                        package_id: 'comfyui',
+                        repo_url: 'https://github.com/huchenlei/ComfyUI-layerdiffuse.git'
                     })
                 });
                 const data = await res.json();
-                if (data.status === 'success') {
-                    showToast('✅ LayerDiffuse installed! Restart ComfyUI to activate.');
-                    if (btn) btn.textContent = 'Restart Required';
+                if (data.status === 'success' && data.job_id) {
+                    showToast('📦 LayerDiffuse cloning... dependencies will install automatically.');
+                    try {
+                        await _waitForExtensionJob(data.job_id, btn, 'Installing');
+                        showToast('✅ LayerDiffuse fully installed! Restarting engine...');
+                        _restartEngineAfterInstall(btn, 'LayerDiffuse');
+                    } catch(jobErr) {
+                        showToast('⚠️ Install issue: ' + jobErr.message);
+                        if (btn) { btn.disabled = false; btn.textContent = 'Retry Install'; }
+                    }
                 } else {
                     showToast('⚠️ Install failed: ' + (data.message || 'Unknown error'));
                     if (btn) { btn.disabled = false; btn.textContent = 'Install Now'; }
@@ -9151,6 +9621,318 @@
                 // Piggyback on switchTab to re-check each time user enters Inference
                 // Initial check fires 3s after first DOMContentLoaded
                 setTimeout(checkAddonExtensions, 3000);
+            }
+        });
+
+        /* Phase 4: IP-Adapter reference image file handler */
+        function handleZoneIpaFile(zone, file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const b64 = ev.target.result.split(',')[1];
+                zone.dataset.ipaImageB64 = b64;
+                const dropZone = zone.querySelector('.zone-ipa-drop');
+                if (dropZone) {
+                    dropZone.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = ev.target.result;
+                    dropZone.appendChild(img);
+                    dropZone.classList.add('has-image');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /* Phase 4: Install ComfyUI_IPAdapter_plus */
+        async function installIPAdapter() {
+            const btn = document.getElementById('inf-ipa-install-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Installing...'; }
+            try {
+                const res = await fetch('/api/extensions/install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        package_id: 'comfyui',
+                        repo_url: 'https://github.com/cubiq/ComfyUI_IPAdapter_plus.git'
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success' && data.job_id) {
+                    showToast('📦 IPAdapter Plus cloning... dependencies will install automatically.');
+                    try {
+                        await _waitForExtensionJob(data.job_id, btn, 'Installing');
+                        showToast('✅ IPAdapter Plus fully installed! Restarting engine...');
+                        _restartEngineAfterInstall(btn, 'IPAdapter Plus');
+                    } catch(jobErr) {
+                        showToast('⚠️ Install issue: ' + jobErr.message);
+                        if (btn) { btn.disabled = false; btn.textContent = 'Retry Install'; }
+                    }
+                } else {
+                    showToast('⚠️ Install failed: ' + (data.message || 'Unknown error'));
+                    if (btn) { btn.disabled = false; btn.textContent = 'Install Now'; }
+                }
+            } catch(e) {
+                showToast('⚠️ Install request failed: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = 'Install Now'; }
+            }
+        }
+
+        /* ═══ Phase 5 — SAM Smart Masking Engine ═══ */
+        window._samActive = false;
+        window._samPoints = [];        // [{x, y, label}] normalized 0-1
+        window._samMaskB64 = null;     // Current mask from SAM
+        window._samInverted = false;   // Is mask currently inverted?
+
+        function toggleSamMode() {
+            const img = document.getElementById('inf-canvas-img');
+            if (!window._samActive && (img.style.display === 'none' || !img.src)) {
+                showToast('Generate or load an image first.');
+                return;
+            }
+            // Mutual exclusion
+            if (!window._samActive && window._inpaintActive) toggleInpaintMode();
+            if (!window._samActive && window._regionMode) toggleRegionMode();
+
+            window._samActive = !window._samActive;
+            const toolbar = document.getElementById('sam-toolbar');
+            const toggleBtn = document.getElementById('inf-sam-toggle');
+            const container = document.getElementById('inf-canvas-container');
+
+            if (window._samActive) {
+                toolbar.classList.add('active');
+                toggleBtn.classList.add('active');
+                container.style.cursor = 'crosshair';
+                showModeBanner('sam', '🪄 SAM MODE — Left-click to include, Right-click to exclude');
+                // Attach click handler
+                container.addEventListener('click', _samClickHandler);
+                container.addEventListener('contextmenu', _samRightClickHandler);
+            } else {
+                toolbar.classList.remove('active');
+                toggleBtn.classList.remove('active');
+                container.style.cursor = 'crosshair';
+                hideModeBanner();
+                container.removeEventListener('click', _samClickHandler);
+                container.removeEventListener('contextmenu', _samRightClickHandler);
+                clearSamPoints();
+            }
+        }
+
+        function _samClickHandler(e) {
+            if (!window._samActive) return;
+            // Don't capture clicks on toolbar buttons
+            if (e.target.closest('.sam-toolbar')) return;
+            const coords = _getSamImageCoords(e);
+            if (!coords) return;
+            _addSamPoint(coords.x, coords.y, 1, e);
+        }
+
+        function _samRightClickHandler(e) {
+            if (!window._samActive) return;
+            e.preventDefault();
+            if (e.target.closest('.sam-toolbar')) return;
+            const coords = _getSamImageCoords(e);
+            if (!coords) return;
+            _addSamPoint(coords.x, coords.y, 0, e);
+        }
+
+        function _getSamImageCoords(e) {
+            const img = document.getElementById('inf-canvas-img');
+            if (!img || img.style.display === 'none') return null;
+            const rect = img.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+            return { x, y };
+        }
+
+        function _addSamPoint(x, y, label, e) {
+            window._samPoints.push({ x, y, label });
+            // Render point marker
+            const img = document.getElementById('inf-canvas-img');
+            const container = document.getElementById('inf-canvas-container');
+            const imgRect = img.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const dot = document.createElement('div');
+            dot.className = `sam-point ${label === 1 ? 'positive' : 'negative'}`;
+            dot.style.left = (imgRect.left - containerRect.left + x * imgRect.width) + 'px';
+            dot.style.top = (imgRect.top - containerRect.top + y * imgRect.height) + 'px';
+            dot.dataset.samPoint = 'true';
+            container.appendChild(dot);
+
+            // Request SAM mask
+            _requestSamMask();
+        }
+
+        function clearSamPoints() {
+            window._samPoints = [];
+            window._samMaskB64 = null;
+            window._samInverted = false;
+            // Remove point markers
+            document.querySelectorAll('.sam-point').forEach(p => p.remove());
+            // Hide mask overlay
+            const overlay = document.getElementById('sam-mask-overlay');
+            if (overlay) overlay.classList.remove('active');
+            // Disable action buttons
+            _setSamButtons(false);
+            document.getElementById('sam-status').textContent = '🪄 Click to select objects';
+        }
+
+        function _setSamButtons(enabled) {
+            ['sam-apply-btn', 'sam-add-btn', 'sam-invert-btn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = !enabled;
+            });
+        }
+
+        async function _requestSamMask() {
+            if (window._samPoints.length === 0) return;
+            const status = document.getElementById('sam-status');
+            status.textContent = '⏳ Segmenting...';
+
+            const img = document.getElementById('inf-canvas-img');
+            // Get image as base64
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const b64 = canvas.toDataURL('image/png').split(',')[1];
+
+            try {
+                const res = await fetch('/api/sam_segment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_b64: b64,
+                        points: window._samPoints
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success' && data.mask_b64) {
+                    window._samMaskB64 = data.mask_b64;
+                    window._samInverted = false;
+                    _renderSamMaskOverlay(data.mask_b64);
+                    _setSamButtons(true);
+                    status.textContent = `🪄 ${window._samPoints.length} point(s) — mask ready`;
+                } else {
+                    status.textContent = '⚠️ ' + (data.error || 'SAM failed');
+                    showToast('⚠️ SAM: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                status.textContent = '⚠️ Request failed';
+                showToast('⚠️ SAM request failed: ' + err.message);
+            }
+        }
+
+        function _renderSamMaskOverlay(maskB64) {
+            const overlay = document.getElementById('sam-mask-overlay');
+            const img = document.getElementById('inf-canvas-img');
+            const container = document.getElementById('inf-canvas-container');
+            if (!overlay || !img) return;
+
+            const imgRect = img.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            overlay.width = imgRect.width;
+            overlay.height = imgRect.height;
+            overlay.style.left = (imgRect.left - containerRect.left) + 'px';
+            overlay.style.top = (imgRect.top - containerRect.top) + 'px';
+            overlay.style.width = imgRect.width + 'px';
+            overlay.style.height = imgRect.height + 'px';
+
+            const maskImg = new Image();
+            maskImg.onload = () => {
+                const ctx = overlay.getContext('2d');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+                // Draw mask
+                ctx.drawImage(maskImg, 0, 0, overlay.width, overlay.height);
+                // Tint green for visibility
+                ctx.globalCompositeOperation = 'source-in';
+                ctx.fillStyle = 'rgba(16, 185, 129, 1)';
+                ctx.fillRect(0, 0, overlay.width, overlay.height);
+                ctx.globalCompositeOperation = 'source-over';
+                overlay.classList.add('active');
+            };
+            maskImg.src = 'data:image/png;base64,' + maskB64;
+        }
+
+        function invertSamMask() {
+            if (!window._samMaskB64) return;
+            // Invert the mask by drawing it inverted
+            const overlay = document.getElementById('sam-mask-overlay');
+            if (!overlay) return;
+            const ctx = overlay.getContext('2d');
+            const w = overlay.width, h = overlay.height;
+
+            // Get current image data from the mask (we invert the original mask b64)
+            const maskImg = new Image();
+            maskImg.onload = () => {
+                const tc = document.createElement('canvas');
+                tc.width = maskImg.naturalWidth;
+                tc.height = maskImg.naturalHeight;
+                const tctx = tc.getContext('2d');
+                tctx.drawImage(maskImg, 0, 0);
+                const imgData = tctx.getImageData(0, 0, tc.width, tc.height);
+                for (let i = 0; i < imgData.data.length; i += 4) {
+                    imgData.data[i] = 255 - imgData.data[i];
+                    imgData.data[i+1] = 255 - imgData.data[i+1];
+                    imgData.data[i+2] = 255 - imgData.data[i+2];
+                }
+                tctx.putImageData(imgData, 0, 0);
+                window._samMaskB64 = tc.toDataURL('image/png').split(',')[1];
+                window._samInverted = !window._samInverted;
+                _renderSamMaskOverlay(window._samMaskB64);
+            };
+            maskImg.src = 'data:image/png;base64,' + window._samMaskB64;
+        }
+
+        function applySamMaskToInpaint() {
+            if (!window._samMaskB64) return;
+            _transferSamMask('replace');
+        }
+
+        function addSamMaskToInpaint() {
+            if (!window._samMaskB64) return;
+            _transferSamMask('add');
+        }
+
+        function _transferSamMask(mode) {
+            // Activate inpaint mode if not already
+            if (!window._inpaintActive) toggleInpaintMode();
+
+            const maskImg = new Image();
+            maskImg.onload = () => {
+                const inpaintCanvas = document.getElementById('inpaint-canvas');
+                if (!inpaintCanvas) return;
+                const ctx = inpaintCanvas.getContext('2d');
+
+                if (mode === 'replace') {
+                    ctx.clearRect(0, 0, inpaintCanvas.width, inpaintCanvas.height);
+                }
+
+                // Draw SAM mask as white with inpaint opacity
+                const opacity = window._inpaintOpacity || 0.55;
+                ctx.globalAlpha = opacity;
+                ctx.drawImage(maskImg, 0, 0, inpaintCanvas.width, inpaintCanvas.height);
+                ctx.globalAlpha = 1.0;
+
+                // Exit SAM mode
+                toggleSamMode();
+                showToast(`🪄 SAM mask ${mode === 'replace' ? 'applied' : 'added'} to inpaint canvas`);
+            };
+            maskImg.src = 'data:image/png;base64,' + window._samMaskB64;
+        }
+
+        /** Keyboard shortcut: S to toggle SAM mode */
+        document.addEventListener('keydown', (e) => {
+            const tag = e.target.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            const infView = document.getElementById('view-inference');
+            if (!infView || infView.style.display === 'none') return;
+
+            if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+                e.preventDefault();
+                toggleSamMode();
             }
         });
         /* ═══ IS-01/IS-05: Unified Generation Payload Builder ═══
@@ -9189,6 +9971,15 @@
                 payload.flux_guidance = parseFloat(document.getElementById('inf-flux-guidance')?.value || '3.5');
             }
 
+            // WAN Video parameters
+            if (modelType.includes('wan-video')) {
+                payload.video_frames = parseInt(document.getElementById('inf-video-frames')?.value || '16');
+                payload.video_fps = parseInt(document.getElementById('inf-video-fps')?.value || '8');
+                payload.motion_strength = parseFloat(document.getElementById('inf-video-motion')?.value || '1.0');
+                // For WAN, reuse FLUX UNET/CLIP-L selectors (shared UI row)
+                payload.flux_unet = document.getElementById('inf-flux-unet')?.value || '';
+                payload.flux_clip_l = document.getElementById('inf-flux-clip-l')?.value || '';
+            }
             // LoRAs
             payload.loras = [];
             document.querySelectorAll('#inf-lora-container > div').forEach(row => {
@@ -9237,6 +10028,11 @@
                 payload.inpaint_denoise = window._inpaintDenoise ?? 0.75;
                 payload.inpaint_mask_blur = window._inpaintMaskBlur ?? 4;
                 payload.inpaint_fill_mode = window._inpaintFillMode ?? 'original';
+                // Optional inpaint model override → triggers InpaintModelConditioning
+                const inpaintOverride = document.getElementById('inpaint-model-override')?.value;
+                if (inpaintOverride) {
+                    payload.inpaint_model_override = inpaintOverride;
+                }
                 const canvasImg = document.getElementById('inf-canvas-img');
                 if (canvasImg && canvasImg.src && canvasImg.style.display !== 'none' && !payload.init_image_b64) {
                     const tmpCanvas = document.createElement('canvas');
@@ -9254,6 +10050,29 @@
                     payload.regions = regionData;
                     payload.region_base_ratio = window._regionBaseRatio ?? 0.0;
                 }
+            }
+
+            // Phase 5: FaceDetailer addon
+            const fdEnable = document.getElementById('inf-fd-enable')?.checked;
+            if (fdEnable) {
+                payload.facedetailer = {
+                    enable: true,
+                    denoise: parseFloat(document.getElementById('inf-fd-denoise')?.value || '0.4'),
+                    bbox_model: document.getElementById('inf-fd-bbox-model')?.value || 'bbox/face_yolov8m.pt',
+                    guide_size: parseInt(document.getElementById('inf-fd-guide-size')?.value || '384'),
+                    feather: parseInt(document.getElementById('inf-fd-feather')?.value || '5'),
+                    max_faces: parseInt(document.getElementById('inf-fd-max-faces')?.value || '10'),
+                    cycle: parseInt(document.getElementById('inf-fd-cycle')?.value || '1')
+                };
+            }
+
+            // Phase 5: LayerDiffuse addon
+            const ldEnable = document.getElementById('inf-ld-enable')?.checked;
+            if (ldEnable) {
+                payload.layerdiffuse = {
+                    enable: true,
+                    method: document.getElementById('inf-ld-method')?.value || 'SDXL, Attention Injection'
+                };
             }
 
             return payload;
@@ -9319,6 +10138,20 @@
                     const optRef = opt.cloneNode(true);
                     ref.appendChild(optRef);
                 });
+
+                // Populate inpaint model override dropdown
+                const inpaintModelSel = document.getElementById('inpaint-model-override');
+                if (inpaintModelSel) {
+                    const lastInpaint = inpaintModelSel.value;
+                    inpaintModelSel.innerHTML = '<option value="">Use Main Model</option>';
+                    data.models.filter(m => m.vault_category === 'checkpoints').forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.filename;
+                        opt.innerText = (m.metadata?.model?.name ? (m.metadata.model.name + " (" + m.filename + ")") : m.filename);
+                        inpaintModelSel.appendChild(opt);
+                    });
+                    if (lastInpaint) inpaintModelSel.value = lastInpaint;
+                }
                 
                 data.models.filter(m => m.vault_category === 'vaes').forEach(m => {
                     const opt = document.createElement('option');
@@ -9786,7 +10619,14 @@
                 
                 if (a1111ProgressInterval) clearInterval(a1111ProgressInterval);
                 
-                if(data.error) throw new Error(data.error);
+                if(data.error) {
+                    const errMsg = typeof data.error === 'string' ? data.error
+                        : data.error.message || data.error.type || JSON.stringify(data.error);
+                    const nodeErrs = data.node_errors ? Object.values(data.node_errors).map(n =>
+                        (n.errors || []).map(e => e.message).join('; ')
+                    ).filter(Boolean).join(' | ') : '';
+                    throw new Error(errMsg + (nodeErrs ? ' — Node errors: ' + nodeErrs : ''));
+                }
 
                 if(engine === 'comfyui') {
                     window.currentPromptId = data.prompt_id;
